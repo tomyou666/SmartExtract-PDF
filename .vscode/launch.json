@@ -1,0 +1,46 @@
+{
+  // IntelliSense を使用して利用可能な属性を学べます。
+  // 既存の属性の説明をホバーして表示します。
+  // 詳細情報は次を確認してください: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "python現在のファイル実行",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/",
+    },
+    {
+      "name": "fastapi起動（デバッグモード）",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/",
+      "env": {
+        "IS_DEBUG": "TRUE"
+      },
+      "args": [
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--reload",
+        "--port",
+        "8000",
+      ],
+    },
+    {
+      "name": "テスト実行",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "IS_DEBUG": "TRUE"
+      },
+    },
+  ]
+}

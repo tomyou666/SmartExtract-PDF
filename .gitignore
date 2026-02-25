@@ -1,0 +1,44 @@
+# === Python (uv / FastAPI) ===
+server/.venv/
+server/__pycache__/
+server/**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# === Node / Bun / Vite (client) ===
+client/node_modules/
+client/dist/
+client/.vite/
+
+# === Environment & secrets ===
+.env
+.env.local
+.env.*.local
+*.pem
+
+# === Uploads & runtime data ===
+server/uploads/*
+!server/uploads/.gitkeep
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === IDE (optional: remove if you commit shared settings) ===
+# .vscode/
+.idea/
+
+# === Logs & temp ===
+*.log
+*.tmp
+.cache/

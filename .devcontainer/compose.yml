@@ -1,0 +1,42 @@
+services:
+  pdf-viewer:
+    container_name: "pdf-viewer-server"
+    # Dockerfileがあるpath、dockerfile名を指示
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # dbコンテナが起動した後に起動するように指示
+    depends_on:
+      - pdf-viewer-db
+    volumes:
+      # devcontainerのworkspaceFolderと一致させる
+      - ..:/workspace:cached
+    ports:
+      - "5173:5173"
+      - "8000:8000"
+    # コンテナ切断をしないように指示
+    command: ["/bin/sh", "-c", "while sleep 1000; do :; done"]
+  pdf-viewer-db:
+    container_name: pdf-viewer-db
+    # DB用のDockerfile指定
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_DB: pdf-viewer-postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/sql:/docker-entrypoint-initdb.d
+      - pdf-viewer-db-data:/var/lib/postgresql/data
+    # コンテナ間の接続を可能にするためのネットワーク設定
+    networks:
+      - default
+    restart: "no"
+volumes:
+  pdf-viewer-db-data:
+
+networks:
+  default:
