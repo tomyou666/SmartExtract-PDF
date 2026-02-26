@@ -1,5 +1,6 @@
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -85,9 +86,11 @@ async def get_pdf_file(
     path = Path(row["storage_path"])
     if not path.exists():
         raise HTTPException(status_code=404, detail="PDF file not found on disk")
+    # RFC 5987: filename* で UTF-8 ファイル名を渡す（非ASCII対応、Latin-1 エラー回避）
+    encoded_filename = quote(row["filename"], safe="")
+    content_disposition = f"inline; filename*=UTF-8''{encoded_filename}"
     return FileResponse(
         path,
         media_type="application/pdf",
-        filename=row["filename"],
-        headers={"Content-Disposition": f'inline; filename="{row["filename"]}"'},
+        headers={"Content-Disposition": content_disposition},
     )
