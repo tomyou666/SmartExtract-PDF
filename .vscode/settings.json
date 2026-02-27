@@ -1,0 +1,12 @@
+{
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports.biome": "explicit",
+        "source.fixAll.biome": "explicit"
+    },
+    "biome.configurationPath": "/workspace/client/biome.json",
+    "biome.lsp.bin": "/workspace/client/node_modules/@biomejs/biome/bin/biome",
+    "[typescriptreact]": {
+        "editor.defaultFormatter": "biomejs.biome"
+    },
+}

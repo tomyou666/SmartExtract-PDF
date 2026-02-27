@@ -21,5 +21,6 @@ RUN echo "export UV_LINK_MODE=copy" >> ~/.bashrc
 RUN echo '# proto \n\
 export PROTO_HOME="$HOME/.proto" \n\
 export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"' >> ~/.bashrc
+RUN ln -s /root/.proto/shims/bun /usr/local/bin/node
 COPY --from=builder /root/.local/ /root/.local/
 COPY --from=builder /root/.proto/ /root/.proto/

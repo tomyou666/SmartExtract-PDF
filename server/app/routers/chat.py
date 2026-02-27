@@ -118,6 +118,75 @@ async def list_messages(
     ]
 
 
+def _parse_message_id(message_id: str) -> UUID:
+    try:
+        return UUID(message_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid message ID")
+
+
+@router.delete("/sessions/{session_id}/messages/{message_id}", status_code=204)
+async def delete_conversation_turn(
+    session_id: str,
+    message_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """指定したメッセージを含む1会話（user+assistantの1ターン）を削除する。"""
+    sid = _parse_session_id(session_id)
+    mid = _parse_message_id(message_id)
+    # セッションの存在確認
+    check = await db.execute(
+        text("SELECT id FROM chat_sessions WHERE id = :id"),
+        {"id": str(sid)},
+    )
+    if check.mappings().one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    # 対象メッセージを取得
+    msg_result = await db.execute(
+        text(
+            "SELECT id, role FROM chat_messages WHERE id = :mid AND session_id = :sid"
+        ),
+        {"mid": str(mid), "sid": str(sid)},
+    )
+    msg_row = msg_result.mappings().one_or_none()
+    if not msg_row:
+        raise HTTPException(status_code=404, detail="Message not found")
+    role = msg_row["role"]
+    # セッション内のメッセージを created_at 順で取得（id, role のみ）
+    order_result = await db.execute(
+        text(
+            "SELECT id, role FROM chat_messages WHERE session_id = :sid ORDER BY created_at"
+        ),
+        {"sid": str(sid)},
+    )
+    ordered = list(order_result.mappings().all())
+    idx = next((i for i, r in enumerate(ordered) if str(r["id"]) == str(mid)), None)
+    if idx is None:
+        raise HTTPException(status_code=404, detail="Message not found")
+    # 削除する id のリスト: 1会話 = user + assistant のペア
+    ids_to_delete = []
+    if role == "user":
+        ids_to_delete.append(str(ordered[idx]["id"]))
+        if idx + 1 < len(ordered) and ordered[idx + 1]["role"] == "assistant":
+            ids_to_delete.append(str(ordered[idx + 1]["id"]))
+    else:  # assistant
+        if idx - 1 >= 0 and ordered[idx - 1]["role"] == "user":
+            ids_to_delete.append(str(ordered[idx - 1]["id"]))
+        ids_to_delete.append(str(ordered[idx]["id"]))
+    for id_val in ids_to_delete:
+        await db.execute(
+            text("DELETE FROM chat_messages WHERE id = :id"),
+            {"id": id_val},
+        )
+    await db.execute(
+        text(
+            "UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = :id"
+        ),
+        {"id": str(sid)},
+    )
+    await db.commit()
+
+
 @router.delete("/sessions/{session_id}", status_code=204)
 async def delete_session(
     session_id: str,
