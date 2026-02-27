@@ -9,7 +9,9 @@
 		"includes": [
 			"**",
 			"!!**/dist",
-			"!!**/node_modules"
+			"!!**/node_modules",
+			"!!**/.git",
+			"!!**/*.json"
 		]
 	},
 	"formatter": {
@@ -23,15 +25,8 @@
 			"nursery": {
 				"useSortedClasses": {
 					"options": {
-						"attributes": [
-							"classList"
-						],
-						"functions": [
-							"clsx",
-							"cva",
-							"tw",
-							"tw.*"
-						]
+						"attributes": ["classList"],
+						"functions": ["clsx", "cva", "tw", "tw.*"]
 					}
 				}
 			}
@@ -49,6 +44,11 @@
 			"source": {
 				"organizeImports": "on"
 			}
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
 		}
 	}
 }
