@@ -1,14 +1,14 @@
+import type { FullScreenPlugin } from '@react-pdf-viewer/full-screen';
 import type { RefObject } from 'react';
 import { create } from 'zustand';
 
-export interface PluginFns {
-	jumpToPage: (pageIndex: number) => Promise<void>;
-	jumpToNextPage: () => Promise<void>;
-	jumpToPreviousPage: () => Promise<void>;
-	zoom: (scale: number) => void;
-	enterFullScreenMode: (target: HTMLElement) => void;
-	exitFullScreenMode: () => void;
-	getViewerState: () => { pageIndex: number; scale: number };
+/** ツールバーからビューアを操作するための API（PdfViewer がセットする） */
+export interface PdfViewerApi {
+	zoomTo: (scale: number) => void;
+	jumpToPage: (pageIndex: number) => void;
+	jumpToNextPage: () => void;
+	jumpToPreviousPage: () => void;
+	fullScreenPlugin: FullScreenPlugin | null;
 }
 
 export interface SelectionRect {
@@ -20,7 +20,8 @@ export interface SelectionRect {
 }
 
 interface PdfViewerState {
-	pluginFns: PluginFns | null;
+	/** ズーム・ページ送り用。PdfViewer マウント時にセット、アンマウントで null */
+	viewerApi: PdfViewerApi | null;
 	pageIndex: number;
 	scale: number;
 	numPages: number;
@@ -29,9 +30,8 @@ interface PdfViewerState {
 	selectionRects: SelectionRect[];
 	selectionMode: boolean;
 	isDrawingMode: boolean;
-	setPluginFns: (fns: PluginFns | null) => void;
-	setViewerState: (pageIndex: number, scale: number) => void;
-	setNumPages: (n: number) => void;
+
+	setViewerApi: (api: PdfViewerApi | null) => void;
 	setViewerContainerRef: (ref: RefObject<HTMLDivElement | null> | null) => void;
 	setPageCanvas: (pageIndex: number, canvas: HTMLCanvasElement | null) => void;
 	addSelectionRect: (rect: SelectionRect) => void;
@@ -45,7 +45,7 @@ interface PdfViewerState {
 }
 
 const initialState = {
-	pluginFns: null as PluginFns | null,
+	viewerApi: null as PdfViewerApi | null,
 	pageIndex: 0,
 	scale: 1,
 	numPages: 0,
@@ -58,12 +58,8 @@ const initialState = {
 
 export const usePdfViewerStore = create<PdfViewerState>((set) => ({
 	...initialState,
-	setPluginFns: (pluginFns) => set({ pluginFns }),
-	setViewerState: (pageIndex, scale) => set({ pageIndex, scale }),
-	setNumPages: (numPages) => set({ numPages }),
-	setViewerContainerRef: (
-		viewerContainerRef: RefObject<HTMLDivElement | null> | null,
-	) => set({ viewerContainerRef }),
+	setViewerApi: (viewerApi) => set({ viewerApi }),
+	setViewerContainerRef: (viewerContainerRef) => set({ viewerContainerRef }),
 	setPageCanvas: (pageIndex, canvas) =>
 		set((s) => {
 			const next = new Map(s.pageCanvases);
@@ -96,8 +92,8 @@ export const usePdfViewerStore = create<PdfViewerState>((set) => ({
 	reset: () =>
 		set({
 			...initialState,
+			viewerApi: null,
 			pageCanvases: new Map(),
 			selectionRects: [],
-			isDrawingMode: false,
 		}),
 }));

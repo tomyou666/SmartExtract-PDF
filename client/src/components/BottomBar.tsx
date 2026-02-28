@@ -1,37 +1,35 @@
+import type { RenderEnterFullScreenProps } from '@react-pdf-viewer/full-screen';
 import {
-	ZoomIn,
-	ZoomOut,
 	ChevronLeft,
 	ChevronRight,
-	Maximize,
 	Download,
+	Maximize,
+	ZoomIn,
+	ZoomOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { usePdfViewerStore } from '@/stores/pdfViewerStore';
 import { API_BASE } from '@/lib/utils';
+import { usePdfViewerStore } from '@/stores/pdfViewerStore';
 
 interface BottomBarProps {
 	pdfId: string | null;
 }
 
 export function BottomBar({ pdfId }: BottomBarProps) {
-	const pluginFns = usePdfViewerStore((s) => s.pluginFns);
+	const api = usePdfViewerStore((s) => s.viewerApi);
 	const pageIndex = usePdfViewerStore((s) => s.pageIndex);
 	const scale = usePdfViewerStore((s) => s.scale);
 	const numPages = usePdfViewerStore((s) => s.numPages);
-	const viewerContainerRef = usePdfViewerStore((s) => s.viewerContainerRef);
 
 	const currentPage = pageIndex + 1;
 	const pageCount = numPages;
+	const EnterFullScreen = api?.fullScreenPlugin?.EnterFullScreen;
 
-	const onZoomIn = () => pluginFns?.zoom(scale + 0.25);
-	const onZoomOut = () => pluginFns?.zoom(Math.max(0.5, scale - 0.25));
-	const onPagePrev = () => pluginFns?.jumpToPreviousPage();
-	const onPageNext = () => pluginFns?.jumpToNextPage();
-	const onFullscreen = () => {
-		const el = viewerContainerRef?.current;
-		if (el) pluginFns?.enterFullScreenMode(el);
-	};
+	const onZoomIn = () => api?.zoomTo(scale + 0.25);
+	const onZoomOut = () => api?.zoomTo(Math.max(0.5, scale - 0.25));
+	const onPagePrev = () => api?.jumpToPreviousPage();
+	const onPageNext = () => api?.jumpToNextPage();
+
 	const onDownload = () => {
 		if (!pdfId) return;
 		const url = `${API_BASE}/api/pdfs/${pdfId}`;
@@ -45,7 +43,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 					variant='ghost'
 					size='icon'
 					onClick={onZoomOut}
-					disabled={!pdfId || !pluginFns}
+					disabled={!pdfId || !api}
 				>
 					<ZoomOut className='h-4 w-4' />
 				</Button>
@@ -56,7 +54,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 					variant='ghost'
 					size='icon'
 					onClick={onZoomIn}
-					disabled={!pdfId || !pluginFns}
+					disabled={!pdfId || !api}
 				>
 					<ZoomIn className='h-4 w-4' />
 				</Button>
@@ -66,7 +64,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 					variant='ghost'
 					size='icon'
 					onClick={onPagePrev}
-					disabled={!pdfId || !pluginFns || currentPage <= 1}
+					disabled={!pdfId || !api || currentPage <= 1}
 				>
 					<ChevronLeft className='h-4 w-4' />
 				</Button>
@@ -77,20 +75,30 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 					variant='ghost'
 					size='icon'
 					onClick={onPageNext}
-					disabled={!pdfId || !pluginFns || currentPage >= pageCount}
+					disabled={!pdfId || !api || currentPage >= pageCount}
 				>
 					<ChevronRight className='h-4 w-4' />
 				</Button>
 			</div>
 			<div className='flex items-center gap-1'>
-				<Button
-					variant='ghost'
-					size='icon'
-					onClick={onFullscreen}
-					disabled={!pdfId || !pluginFns || !viewerContainerRef?.current}
-				>
-					<Maximize className='h-4 w-4' />
-				</Button>
+				{EnterFullScreen ? (
+					<EnterFullScreen>
+						{(props: RenderEnterFullScreenProps) => (
+							<Button
+								variant='ghost'
+								size='icon'
+								onClick={props.onClick}
+								disabled={!pdfId}
+							>
+								<Maximize className='h-4 w-4' />
+							</Button>
+						)}
+					</EnterFullScreen>
+				) : (
+					<Button variant='ghost' size='icon' disabled>
+						<Maximize className='h-4 w-4' />
+					</Button>
+				)}
 				<Button
 					variant='ghost'
 					size='icon'

@@ -2,6 +2,7 @@ import { useLocation, useRoute } from 'wouter';
 import { Layout } from '@/components/Layout';
 import { PdfAppLayout } from '@/components/PdfAppLayout';
 import { PdfViewer } from '@/components/PdfViewer';
+import { PdfSidebarProvider } from '@/contexts/PdfSidebarContext';
 
 export function PdfViewPage() {
 	const [, params] = useRoute('/pdf/:id');
@@ -10,14 +11,16 @@ export function PdfViewPage() {
 
 	return (
 		<Layout>
-			<PdfAppLayout
-				pdfArea={<PdfViewer pdfId={id} />}
-				pdfId={id}
-				onPdfSelect={(numId) => setLocation(`/pdf/${numId}`)}
-				onPdfDelete={(deletedId) => {
-					if (id !== null && String(deletedId) === id) setLocation('/');
-				}}
-			/>
+			<PdfSidebarProvider>
+				<PdfAppLayout
+					pdfArea={<PdfViewer pdfId={id} />}
+					pdfId={id}
+					onPdfSelect={(numId) => setLocation(`/pdf/${numId}`)}
+					onPdfDelete={(deletedId) => {
+						if (id !== null && String(deletedId) === id) setLocation('/');
+					}}
+				/>
+			</PdfSidebarProvider>
 		</Layout>
 	);
 }

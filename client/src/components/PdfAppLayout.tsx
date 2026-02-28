@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Menu, MessageSquare, Settings } from 'lucide-react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { FileText, Menu, MessageSquare, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { PdfSidebarContext } from '@/contexts/PdfSidebarContext';
 import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar, RightSidebarHeader } from './RightSidebar';
 import { BottomBar } from './BottomBar';
 import { LLMSettingsSheet } from './LLMSettingsSheet';
+
+type LeftTabId = 'list' | 'thumbnails' | 'bookmarks';
 
 interface PdfAppLayoutProps {
 	pdfArea: ReactNode;
@@ -31,8 +34,10 @@ export function PdfAppLayout({
 		RIGHT_SIDEBAR_DEFAULT,
 	);
 	const [isResizing, setIsResizing] = useState(false);
+	const [leftTab, setLeftTab] = useState<LeftTabId>('list');
 	const startXRef = useRef(0);
 	const startWidthRef = useRef(0);
+	const { slots } = useContext(PdfSidebarContext);
 
 	const handleResizeStart = useCallback(
 		(e: React.MouseEvent) => {
@@ -103,20 +108,96 @@ export function PdfAppLayout({
 						{leftOpen && <span className='text-sm font-medium'>メニュー</span>}
 					</div>
 					{leftOpen && (
-						<div className='flex flex-1 flex-col overflow-auto p-2'>
-							<LeftSidebar
-								onPdfSelect={onPdfSelect}
-								onPdfDelete={onPdfDelete}
-							/>
-							<Button
-								variant='ghost'
-								size='sm'
-								className='mt-auto'
-								onClick={() => setSettingsOpen(true)}
+						<div className='flex flex-1 flex-col overflow-hidden'>
+							{/* タブ */}
+							<div
+								className='flex border-b border-border'
+								role='tablist'
+								aria-label='左メニュー'
 							>
-								<Settings className='mr-1 h-4 w-4' />
-								設定
-							</Button>
+								<Button
+									variant='ghost'
+									size='sm'
+									className={cn(
+										'flex-1 rounded-none border-b-2 border-transparent',
+										leftTab === 'list' && 'border-primary text-primary',
+									)}
+									onClick={() => setLeftTab('list')}
+									role='tab'
+									aria-selected={leftTab === 'list'}
+								>
+									<FileText className='mr-1 h-4 w-4 shrink-0' />
+									<span className='truncate'>PDF一覧</span>
+								</Button>
+								<Button
+									variant='ghost'
+									size='sm'
+									className={cn(
+										'flex-1 rounded-none border-b-2 border-transparent',
+										leftTab === 'thumbnails' && 'border-primary text-primary',
+									)}
+									onClick={() => setLeftTab('thumbnails')}
+									role='tab'
+									aria-selected={leftTab === 'thumbnails'}
+								>
+									<span className='truncate'>サムネイル</span>
+								</Button>
+								<Button
+									variant='ghost'
+									size='sm'
+									className={cn(
+										'flex-1 rounded-none border-b-2 border-transparent',
+										leftTab === 'bookmarks' && 'border-primary text-primary',
+									)}
+									onClick={() => setLeftTab('bookmarks')}
+									role='tab'
+									aria-selected={leftTab === 'bookmarks'}
+								>
+									<span className='truncate'>目次</span>
+								</Button>
+							</div>
+							{/* タブコンテンツ */}
+							<div className='flex min-h-0 flex-1 flex-col overflow-auto p-2'>
+								{leftTab === 'list' && (
+									<>
+										<LeftSidebar
+											onPdfSelect={onPdfSelect}
+											onPdfDelete={onPdfDelete}
+										/>
+										<Button
+											variant='ghost'
+											size='sm'
+											className='mt-auto'
+											onClick={() => setSettingsOpen(true)}
+										>
+											<Settings className='mr-1 h-4 w-4' />
+											設定
+										</Button>
+									</>
+								)}
+								{leftTab === 'thumbnails' && (
+									<div className='flex min-h-0 flex-1 flex-col overflow-auto'>
+										{slots ? (
+											slots.thumbnails
+										) : (
+											<p className='text-muted-foreground py-4 text-center text-sm'>
+												PDFを選択するとサムネイルが表示されます
+											</p>
+										)}
+									</div>
+								)}
+								{leftTab === 'bookmarks' && (
+									<div className='flex min-h-0 flex-1 flex-col overflow-auto'>
+										{slots ? (
+											slots.bookmarks
+										) : (
+											<p className='text-muted-foreground py-4 text-center text-sm'>
+												PDFを選択すると目次が表示されます
+											</p>
+										)}
+									</div>
+								)}
+							</div>
 						</div>
 					)}
 				</aside>
