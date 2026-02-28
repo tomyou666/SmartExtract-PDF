@@ -8,10 +8,10 @@
 	"files": {
 		"includes": [
 			"**",
-			"!!**/dist",
-			"!!**/node_modules",
-			"!!**/.git",
-			"!!**/*.json"
+			"!**/dist",
+			"!**/node_modules",
+			"!**/.git",
+			"!**/*.json"
 		]
 	},
 	"formatter": {
@@ -56,6 +56,11 @@
 	"css": {
 		"parser": {
 			"tailwindDirectives": true
+		}
+	},
+	"json": {
+		"formatter": {
+			"enabled": false
 		}
 	}
 }
