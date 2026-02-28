@@ -82,6 +82,7 @@ function findPageAtContentPoint(
 }
 
 export function SelectionOverlay() {
+	const selectionMode = usePdfViewerStore((s) => s.selectionMode);
 	const viewerContainerRef = usePdfViewerStore((s) => s.viewerContainerRef);
 	const pageCanvases = usePdfViewerStore((s) => s.pageCanvases);
 	const selectionRects = usePdfViewerStore((s) => s.selectionRects);
@@ -166,32 +167,52 @@ export function SelectionOverlay() {
 		};
 	}, [drawing, pageCanvases, viewerContainerRef, addSelectionRect]);
 
-	const handleDrawingLayerMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-		if ((e.target as HTMLElement).closest('[data-selection-rect]')) return;
+	// 矩形描画モード時: 全面レイヤーでなくキャプチャで mousedown のみ処理し、ホイールは下のスクロールに通す
+	useLayoutEffect(() => {
+		if (!isDrawingMode) return;
 		const container = viewerContainerRef?.current;
-		if (!container || !bounds.containerRect || bounds.pageLayouts.size === 0)
-			return;
-		const contentX =
-			e.clientX - bounds.containerRect.left + container.scrollLeft;
-		const contentY = e.clientY - bounds.containerRect.top + container.scrollTop;
-		const hitPage = findPageAtContentPoint(
-			bounds.pageLayouts,
-			contentX,
-			contentY,
-		);
-		if (hitPage == null) return;
-		const layout = bounds.pageLayouts.get(hitPage)!;
-		const canvasX = (contentX - layout.contentLeft) * layout.scaleX;
-		const canvasY = (contentY - layout.contentTop) * layout.scaleY;
-		setDrawing({
-			pageIndex: hitPage,
-			startX: canvasX,
-			startY: canvasY,
-			currentX: canvasX,
-			currentY: canvasY,
-		});
-	};
+		if (!container) return;
 
+		const onMouseDown = (e: MouseEvent) => {
+			if ((e.target as HTMLElement).closest('[data-selection-rect]')) return;
+			const b = getBounds(container, pageCanvases);
+			if (!b.containerRect || b.pageLayouts.size === 0) return;
+			const contentX =
+				e.clientX - b.containerRect.left + container.scrollLeft;
+			const contentY =
+				e.clientY - b.containerRect.top + container.scrollTop;
+			const hitPage = findPageAtContentPoint(
+				b.pageLayouts,
+				contentX,
+				contentY,
+			);
+			if (hitPage == null) return;
+			e.preventDefault();
+			e.stopPropagation();
+			const layout = b.pageLayouts.get(hitPage)!;
+			const canvasX = (contentX - layout.contentLeft) * layout.scaleX;
+			const canvasY = (contentY - layout.contentTop) * layout.scaleY;
+			setDrawing({
+				pageIndex: hitPage,
+				startX: canvasX,
+				startY: canvasY,
+				currentX: canvasX,
+				currentY: canvasY,
+			});
+		};
+
+		container.addEventListener('mousedown', onMouseDown, { capture: true });
+		return () =>
+			container.removeEventListener('mousedown', onMouseDown, {
+				capture: true,
+			});
+	}, [
+		isDrawingMode,
+		viewerContainerRef,
+		pageCanvases,
+	]);
+
+	if (!selectionMode) return null;
 	if (!bounds.containerRect || bounds.scrollHeight <= 0) return null;
 
 	const { scrollHeight, scrollWidth, pageLayouts } = bounds;
@@ -206,15 +227,7 @@ export function SelectionOverlay() {
 			}}
 			aria-hidden
 		>
-			{/* Drawing layer: only captures events when isDrawingMode; behind Rnds so rects stay interactive */}
-			{isDrawingMode && (
-				<div
-					className='absolute inset-0 z-0'
-					style={{ pointerEvents: 'auto' }}
-					onMouseDown={handleDrawingLayerMouseDown}
-					aria-hidden
-				/>
-			)}
+			{/* 矩形描画の mousedown は useLayoutEffect でコンテナのキャプチャで処理（スクロールがブロックされない） */}
 			{/* Existing rects - pointer-events-auto so only rects capture input when not drawing */}
 			{selectionRects.map((rect, index) => {
 				const layout = pageLayouts.get(rect.pageIndex);

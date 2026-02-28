@@ -19,7 +19,6 @@ import '@react-pdf-viewer/thumbnail/lib/styles/index.css';
 import '@react-pdf-viewer/zoom/lib/styles/index.css';
 
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
-import { SelectionOverlay } from '@/components/SelectionOverlay';
 
 import { PdfSidebarContext } from '@/contexts/PdfSidebarContext';
 import { API_BASE } from '@/lib/utils';
@@ -34,11 +33,7 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [containerHeight, setContainerHeight] = useState(0);
 	const setViewerApi = usePdfViewerStore((s) => s.setViewerApi);
-	const setViewerContainerRef = usePdfViewerStore(
-		(s) => s.setViewerContainerRef,
-	);
 	const reset = usePdfViewerStore((s) => s.reset);
-	const selectionMode = usePdfViewerStore((s) => s.selectionMode);
 	const setSlots = useContext(PdfSidebarContext).setSlots;
 
 	// example に合わせてトップレベルで呼ぶ（useMemo 内で呼ぶとプラグイン内のフックが Rules of Hooks に違反する）
@@ -65,13 +60,11 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 	}, []);
 
 	useEffect(() => {
-		setViewerContainerRef(containerRef);
 		return () => {
 			reset();
-			setViewerContainerRef(null);
 			setViewerApi(null);
 		};
-	}, [setViewerApi, setViewerContainerRef, reset]);
+	}, [setViewerApi, reset]);
 
 	// プラグインは毎レンダーで新しくなるため、viewerApi だけ別 effect で更新（reset は呼ばない）
 	useEffect(() => {
@@ -123,7 +116,6 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 				<Worker workerUrl={workerSrc}>
 					<Viewer fileUrl={url} plugins={plugins} />
 				</Worker>
-				{selectionMode && <SelectionOverlay />}
 			</div>
 		</div>
 	);
