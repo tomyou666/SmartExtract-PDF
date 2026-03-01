@@ -177,15 +177,9 @@ export function SelectionOverlay() {
 			if ((e.target as HTMLElement).closest('[data-selection-rect]')) return;
 			const b = getBounds(container, pageCanvases);
 			if (!b.containerRect || b.pageLayouts.size === 0) return;
-			const contentX =
-				e.clientX - b.containerRect.left + container.scrollLeft;
-			const contentY =
-				e.clientY - b.containerRect.top + container.scrollTop;
-			const hitPage = findPageAtContentPoint(
-				b.pageLayouts,
-				contentX,
-				contentY,
-			);
+			const contentX = e.clientX - b.containerRect.left + container.scrollLeft;
+			const contentY = e.clientY - b.containerRect.top + container.scrollTop;
+			const hitPage = findPageAtContentPoint(b.pageLayouts, contentX, contentY);
 			if (hitPage == null) return;
 			e.preventDefault();
 			e.stopPropagation();
@@ -206,11 +200,7 @@ export function SelectionOverlay() {
 			container.removeEventListener('mousedown', onMouseDown, {
 				capture: true,
 			});
-	}, [
-		isDrawingMode,
-		viewerContainerRef,
-		pageCanvases,
-	]);
+	}, [isDrawingMode, viewerContainerRef, pageCanvases]);
 
 	if (!selectionMode) return null;
 	if (!bounds.containerRect || bounds.scrollHeight <= 0) return null;

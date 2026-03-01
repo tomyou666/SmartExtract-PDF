@@ -14,7 +14,9 @@ function PagesContainerRefSync({
 }: {
 	pagesContainerRef: RefObject<HTMLDivElement | null>;
 }) {
-	const setViewerContainerRef = usePdfViewerStore((s) => s.setViewerContainerRef);
+	const setViewerContainerRef = usePdfViewerStore(
+		(s) => s.setViewerContainerRef,
+	);
 	useEffect(() => {
 		setViewerContainerRef(pagesContainerRef);
 		return () => setViewerContainerRef(null);

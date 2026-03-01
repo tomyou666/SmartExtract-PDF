@@ -26,7 +26,9 @@ export function LLMSettingsSheet({ open, onClose }: LLMSettingsSheetProps) {
 			setModels([]);
 			return;
 		}
-		fetch(`${API_BASE}/api/settings/llm/models?provider=${encodeURIComponent(p)}`)
+		fetch(
+			`${API_BASE}/api/settings/llm/models?provider=${encodeURIComponent(p)}`,
+		)
 			.then((r) => r.json())
 			.then((data: { models: string[] }) => setModels(data.models ?? []))
 			.catch(() => setModels([]));
@@ -37,7 +39,9 @@ export function LLMSettingsSheet({ open, onClose }: LLMSettingsSheetProps) {
 		// Load providers
 		fetch(`${API_BASE}/api/settings/llm/providers`)
 			.then((r) => r.json())
-			.then((data: ProviderOption[]) => setProviders(Array.isArray(data) ? data : []))
+			.then((data: ProviderOption[]) =>
+				setProviders(Array.isArray(data) ? data : []),
+			)
 			.catch(() => setProviders([]));
 		// Load current settings
 		fetch(`${API_BASE}/api/settings/llm`)
@@ -100,9 +104,7 @@ export function LLMSettingsSheet({ open, onClose }: LLMSettingsSheetProps) {
 			role='dialog'
 			aria-modal='true'
 		>
-			<div
-				className='bg-background border-border flex max-h-[90vh] w-full max-w-md flex-col rounded-lg border p-4 shadow-lg'
-			>
+			<div className='bg-background border-border flex max-h-[90vh] w-full max-w-md flex-col rounded-lg border p-4 shadow-lg'>
 				<h3 className='mb-4 flex items-center gap-2 text-lg font-semibold'>
 					<Settings className='h-5 w-5' />
 					LLM 設定
