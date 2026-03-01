@@ -35,9 +35,7 @@ def _content_str(m: dict) -> str:
     if isinstance(c, str):
         return c
     if isinstance(c, list):
-        return " ".join(
-            p.get("text", "") if isinstance(p, dict) else str(p) for p in c
-        )
+        return " ".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in c)
     return str(c) if c else ""
 
 
@@ -194,9 +192,7 @@ async def delete_conversation_turn(
             {"id": id_val},
         )
     await db.execute(
-        text(
-            "UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = :id"
-        ),
+        text("UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = :id"),
         {"id": str(sid)},
     )
     await db.commit()

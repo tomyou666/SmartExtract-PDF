@@ -51,7 +51,10 @@ async def list_pdfs(db: AsyncSession = Depends(get_db)) -> list[PdfOut]:
         text("SELECT id, filename, created_at FROM pdfs ORDER BY created_at DESC")
     )
     rows = result.mappings().all()
-    return [PdfOut(id=r["id"], filename=r["filename"], created_at=r["created_at"]) for r in rows]
+    return [
+        PdfOut(id=r["id"], filename=r["filename"], created_at=r["created_at"])
+        for r in rows
+    ]
 
 
 @router.delete("/{pdf_id}", status_code=204)
@@ -122,7 +125,10 @@ async def get_pdf_toc(
         raise HTTPException(status_code=404, detail="PDF not found")
     toc_json = row["toc_json"]
     if toc_json is None:
-        raise HTTPException(status_code=404, detail="目次が未生成です。POST /api/pdfs/{pdf_id}/toc で生成してください。")
+        raise HTTPException(
+            status_code=404,
+            detail="目次が未生成です。POST /api/pdfs/{pdf_id}/toc で生成してください。",
+        )
     return toc_json
 
 

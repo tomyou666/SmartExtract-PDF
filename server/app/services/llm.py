@@ -6,7 +6,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-def db_row_to_ui_message(role: str, content_json: dict[str, Any] | None) -> dict[str, Any]:
+def db_row_to_ui_message(
+    role: str, content_json: dict[str, Any] | None
+) -> dict[str, Any]:
     """Convert a DB message row (role, content_json) to UI message format for build_litellm_messages."""
     content_json = content_json or {}
     parts = content_json.get("parts")
@@ -53,9 +55,15 @@ def build_litellm_messages(ui_messages: list[dict[str, Any]]) -> list[dict[str, 
         # 最新のメッセージのみ experimental_attachments（画像添付）を含める
         if is_last_message:
             for att in msg.get("experimental_attachments") or []:
-                url = att.get("url") if isinstance(att, dict) else getattr(att, "url", None)
+                url = (
+                    att.get("url")
+                    if isinstance(att, dict)
+                    else getattr(att, "url", None)
+                )
                 if url:
-                    content_parts.append({"type": "image_url", "image_url": {"url": url}})
+                    content_parts.append(
+                        {"type": "image_url", "image_url": {"url": url}}
+                    )
         if content_parts:
             out.append({"role": role, "content": content_parts})
         elif not out or out[-1].get("role") != role:
@@ -66,9 +74,7 @@ def build_litellm_messages(ui_messages: list[dict[str, Any]]) -> list[dict[str, 
 async def get_llm_config(db: AsyncSession) -> tuple[str, str, str | None]:
     """Return (model_string, provider, api_key). model_string is e.g. openai/gpt-4o."""
     result = await db.execute(
-        text(
-            "SELECT provider, api_key_encrypted, model FROM llm_settings WHERE id = 1"
-        )
+        text("SELECT provider, api_key_encrypted, model FROM llm_settings WHERE id = 1")
     )
     row = result.mappings().one_or_none()
     if not row:
