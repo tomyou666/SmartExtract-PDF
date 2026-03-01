@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { API_BASE } from '@/lib/utils';
+
+interface ProviderOption {
+	value: string;
+	label: string;
+}
 
 interface LLMSettingsSheetProps {
 	open: boolean;
@@ -9,13 +14,32 @@ interface LLMSettingsSheetProps {
 }
 
 export function LLMSettingsSheet({ open, onClose }: LLMSettingsSheetProps) {
-	const [provider, setProvider] = useState('openai');
-	const [model, setModel] = useState('gpt-4o');
+	const [providers, setProviders] = useState<ProviderOption[]>([]);
+	const [models, setModels] = useState<string[]>([]);
+	const [provider, setProvider] = useState('');
+	const [model, setModel] = useState('');
 	const [apiKey, setApiKey] = useState('');
 	const [saved, setSaved] = useState(false);
 
+	const fetchModelsForProvider = useCallback((p: string) => {
+		if (!p) {
+			setModels([]);
+			return;
+		}
+		fetch(`${API_BASE}/api/settings/llm/models?provider=${encodeURIComponent(p)}`)
+			.then((r) => r.json())
+			.then((data: { models: string[] }) => setModels(data.models ?? []))
+			.catch(() => setModels([]));
+	}, []);
+
 	useEffect(() => {
 		if (!open) return;
+		// Load providers
+		fetch(`${API_BASE}/api/settings/llm/providers`)
+			.then((r) => r.json())
+			.then((data: ProviderOption[]) => setProviders(Array.isArray(data) ? data : []))
+			.catch(() => setProviders([]));
+		// Load current settings
 		fetch(`${API_BASE}/api/settings/llm`)
 			.then((r) => r.json())
 			.then(
@@ -24,13 +48,29 @@ export function LLMSettingsSheet({ open, onClose }: LLMSettingsSheetProps) {
 					model: string;
 					api_key_masked?: boolean;
 				}) => {
-					setProvider(data.provider ?? 'openai');
-					setModel(data.model ?? 'gpt-4o');
+					const p = data.provider ?? 'openai';
+					const m = data.model ?? '';
+					setProvider(p);
+					setModel(m);
 					setApiKey(data.api_key_masked ? '********' : '');
+					fetchModelsForProvider(p);
 				},
 			)
 			.catch(() => {});
-	}, [open]);
+	}, [open, fetchModelsForProvider]);
+
+	// When models load, keep saved model if it's in the list; otherwise pick first or leave empty
+	useEffect(() => {
+		if (models.length > 0 && model && !models.includes(model)) {
+			setModel(models[0]);
+		}
+	}, [models, model]);
+
+	const handleProviderChange = (p: string) => {
+		setProvider(p);
+		setModel('');
+		fetchModelsForProvider(p);
+	};
 
 	const handleSave = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -49,6 +89,8 @@ export function LLMSettingsSheet({ open, onClose }: LLMSettingsSheetProps) {
 			setTimeout(() => setSaved(false), 2000);
 		}
 	};
+
+	const modelSelectDisabled = !provider || models.length === 0;
 
 	if (!open) return null;
 
@@ -71,23 +113,35 @@ export function LLMSettingsSheet({ open, onClose }: LLMSettingsSheetProps) {
 						<select
 							className='border-border bg-background mt-1 w-full rounded border px-2 py-1'
 							value={provider}
-							onChange={(e) => setProvider(e.target.value)}
+							onChange={(e) => handleProviderChange(e.target.value)}
 						>
-							<option value='openai'>OpenAI</option>
-							<option value='anthropic'>Anthropic</option>
-							<option value='gemini'>Gemini</option>
-							<option value='groq'>Groq</option>
+							<option value=''>選択してください</option>
+							{providers.map((opt) => (
+								<option key={opt.value} value={opt.value}>
+									{opt.label}
+								</option>
+							))}
 						</select>
 					</label>
 					<label className='text-sm font-medium'>
 						モデル
-						<input
-							type='text'
-							className='border-border bg-background mt-1 w-full rounded border px-2 py-1'
+						<select
+							className='border-border bg-background mt-1 w-full rounded border px-2 py-1 disabled:opacity-50'
 							value={model}
 							onChange={(e) => setModel(e.target.value)}
-							placeholder='gpt-4o'
-						/>
+							disabled={modelSelectDisabled}
+						>
+							<option value=''>
+								{modelSelectDisabled
+									? 'プロバイダーを選択してください'
+									: '選択してください'}
+							</option>
+							{models.map((m) => (
+								<option key={m} value={m}>
+									{m}
+								</option>
+							))}
+						</select>
 					</label>
 					<label className='text-sm font-medium'>
 						API キー
