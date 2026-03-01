@@ -97,11 +97,11 @@ export function LLMSettingsSheet({ open, onClose }: LLMSettingsSheetProps) {
 	return (
 		<div
 			className='fixed inset-0 z-50 flex items-center justify-center bg-black/50'
-			onClick={onClose}
+			role='dialog'
+			aria-modal='true'
 		>
 			<div
 				className='bg-background border-border flex max-h-[90vh] w-full max-w-md flex-col rounded-lg border p-4 shadow-lg'
-				onClick={(e) => e.stopPropagation()}
 			>
 				<h3 className='mb-4 flex items-center gap-2 text-lg font-semibold'>
 					<Settings className='h-5 w-5' />
