@@ -15,6 +15,7 @@ dependencies = [
     "aiofiles>=24.1.0",
     "python-multipart>=0.0.9",
     "pypdf>=6.7.4",
+    "pikepdf>=10.3.0",
 ]
 
 [project.optional-dependencies]

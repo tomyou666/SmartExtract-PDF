@@ -1,3 +1,5 @@
+import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -5,6 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings as config_settings
 from app.routers import pdfs, settings, chat
+
+# アプリ全体のログを標準出力に出す
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
 
 
 @asynccontextmanager

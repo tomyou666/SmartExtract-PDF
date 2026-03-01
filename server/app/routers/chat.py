@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from uuid import UUID
 
@@ -7,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 import litellm
+from litellm import completion_cost, cost_per_token
 
 from app.db import get_db, async_session_maker
 from app.schemas.chat import SessionCreate, SessionOut, SessionUpdate, MessageOut
@@ -17,6 +19,7 @@ from app.services.llm import (
 )
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+logger = logging.getLogger(__name__)
 
 
 def _parse_session_id(session_id: str) -> UUID:
@@ -24,6 +27,18 @@ def _parse_session_id(session_id: str) -> UUID:
         return UUID(session_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid session ID")
+
+
+def _content_str(m: dict) -> str:
+    """LiteLLM message dict の content を1つの文字列にする（コスト概算用）。"""
+    c = m.get("content")
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        return " ".join(
+            p.get("text", "") if isinstance(p, dict) else str(p) for p in c
+        )
+    return str(c) if c else ""
 
 
 @router.get("/sessions", response_model=list[SessionOut])
@@ -257,13 +272,20 @@ async def _stream_chat(session_id: str, messages: list, db: AsyncSession):
         yield "No messages to send."
         return
     full_content: list[str] = []
+    stream_usage = None  # usage from last chunk when stream_options include_usage
     try:
         response = await litellm.acompletion(
             model=model_string,
             messages=litellm_messages,
             stream=True,
+            stream_options={"include_usage": True},
         )
         async for chunk in response:
+            if getattr(chunk, "usage", None) and (
+                getattr(chunk.usage, "prompt_tokens", None) is not None
+                or getattr(chunk.usage, "completion_tokens", None) is not None
+            ):
+                stream_usage = chunk.usage
             if chunk.choices and len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta
                 if delta and delta.content:
@@ -272,6 +294,39 @@ async def _stream_chat(session_id: str, messages: list, db: AsyncSession):
     except Exception as e:
         yield f"\n[Error: {e!s}]"
         return
+    # Cost logging (stream)
+    assistant_text = "".join(full_content)
+    try:
+        if stream_usage and (
+            getattr(stream_usage, "prompt_tokens", None) is not None
+            or getattr(stream_usage, "completion_tokens", None) is not None
+        ):
+            pt = getattr(stream_usage, "prompt_tokens", 0) or 0
+            ct = getattr(stream_usage, "completion_tokens", 0) or 0
+            prompt_cost, completion_cost_usd = cost_per_token(
+                model=model_string, prompt_tokens=pt, completion_tokens=ct
+            )
+            total_cost = (prompt_cost or 0) + (completion_cost_usd or 0)
+            logger.info(
+                "LLM cost (stream): model=%s prompt_tokens=%s completion_tokens=%s cost_usd=%.6f",
+                model_string,
+                pt,
+                ct,
+                total_cost,
+            )
+        else:
+            cost = completion_cost(
+                model=model_string,
+                prompt=" ".join(_content_str(m) for m in litellm_messages),
+                completion=assistant_text,
+            )
+            logger.info(
+                "LLM cost (stream, estimated): model=%s cost_usd=%.6f",
+                model_string,
+                float(cost or 0),
+            )
+    except Exception as cost_err:
+        logger.warning("LLM cost logging failed: %s", cost_err, exc_info=True)
     # Persist user (last) and assistant messages (use new session for write)
     last_msg = messages[-1] if messages else None
     content_json = {}
@@ -282,7 +337,6 @@ async def _stream_chat(session_id: str, messages: list, db: AsyncSession):
             if isinstance(user_content, list)
             else {"text": str(user_content)}
         )
-    assistant_text = "".join(full_content)
     async with async_session_maker() as write_session:
         if content_json:
             await write_session.execute(
@@ -390,6 +444,15 @@ async def generate_session_title(
             messages=[{"role": "user", "content": prompt}],
             stream=False,
         )
+        try:
+            cost = completion_cost(completion_response=response)
+            logger.info(
+                "LLM cost (title): model=%s cost_usd=%.6f",
+                model_string,
+                float(cost or 0),
+            )
+        except Exception as cost_err:
+            logger.warning("LLM cost logging failed: %s", cost_err, exc_info=True)
         title = (
             response.choices[0].message.content.strip().strip('"')[:50]
             if response.choices

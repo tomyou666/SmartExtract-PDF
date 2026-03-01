@@ -2,6 +2,7 @@
 
 import base64
 import json
+import logging
 import math
 import os
 import shutil
@@ -9,22 +10,50 @@ import tempfile
 from pathlib import Path
 
 import litellm
+from litellm import completion_cost
 from litellm.utils import supports_pdf_input
+from pikepdf import Pdf
 from pypdf import PdfReader, PdfWriter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.toc import TocResponse
 from app.services.llm import get_llm_config
 
+logger = logging.getLogger(__name__)
+
 # 目次抽出に渡す最大テキスト長（テキスト抽出フォールバック時・トークン節約）
 MAX_TEXT_FOR_TOC = 30_000
 
-# 分割判定: 元サイズ + 1MB で 50MB 超なら分割（オーバーヘッド考慮）
+# 分割判定: 元サイズ 50MB 超なら分割
 CHUNK_MAX_BYTES = 50 * 1024 * 1024  # 50MB
-SPLIT_THRESHOLD_BYTES = CHUNK_MAX_BYTES + 1 * 1024 * 1024  # 51MB
+SPLIT_THRESHOLD_BYTES = CHUNK_MAX_BYTES
 
 # PDF入力対応プロバイダ: Vertex AI, Bedrock, Anthropic API, OpenAI API, Mistral(file_idのみ)
 # https://docs.litellm.ai/docs/completion/document_understanding
+
+
+def _clean_pdf(pdf_path: Path) -> Path:
+    """
+    未使用オブジェクトとメタデータ（プロパティ）を削除したPDFを一時ファイルに書き出す。
+    返り値のパスは呼び出し側で削除すること。
+    """
+    reader = PdfReader(str(pdf_path))
+    writer = PdfWriter()
+    writer.append_pages_from_reader(reader)
+    writer.compress_identical_objects(remove_identicals=True, remove_orphans=True)
+    writer.metadata = None  # /Info などのプロパティを削除
+    fd, temp_path = tempfile.mkstemp(suffix=".pdf", prefix="toc_cleaned_")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            writer.write(f)
+        return Path(temp_path)
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        os.unlink(temp_path)
+        raise
 
 
 def _split_pdf_into_chunks(
@@ -47,11 +76,19 @@ def _split_pdf_into_chunks(
             break
         start_page_1based = start + 1
         writer = PdfWriter()
-        for p in range(start, end):
-            writer.add_page(reader.pages[p])
+        # 必要なページのみ取り込むため append を使用（add_page は元のページ情報を引き継ぎやすい）
+        writer.append(pdf_path, outline_item=None, pages=(start, end))
+        # 未参照オブジェクトの削除と同一オブジェクトの統合でチャンクサイズを削減
+        writer.compress_identical_objects(remove_identicals=True, remove_orphans=True)
+        for page in writer.pages:
+            page.compress_content_streams()
         chunk_path = temp_dir / f"chunk_{i}.pdf"
         with open(chunk_path, "wb") as f:
             writer.write(f)
+        # pikepdf で未使用オブジェクトを削除
+        with Pdf.open(chunk_path, allow_overwriting_input=True) as pdf:
+            pdf.remove_unreferenced_resources()
+            pdf.save(chunk_path)
         result.append((chunk_path, start_page_1based))
     return (result, temp_dir)
 
@@ -142,6 +179,15 @@ async def _extract_toc_single(
         stream=False,
         response_format=TocResponse,
     )
+    try:
+        cost = completion_cost(completion_response=response)
+        logger.info(
+            "LLM cost (toc extract): model=%s cost_usd=%.6f",
+            model_string,
+            float(cost or 0),
+        )
+    except Exception as cost_err:
+        logger.warning("LLM cost logging failed: %s", cost_err, exc_info=True)
     if not response.choices or not response.choices[0].message.content:
         return {"items": []}
     raw = response.choices[0].message.content.strip()
@@ -157,9 +203,17 @@ async def _merge_partial_tocs_with_llm(
     partial_tocs_with_info: 各要素は {"start_page_1based": int, "items": [TocItem...]}
     """
     merge_system = (
-        "あなたは複数の部分目次を1つにまとめるアシスタントです。"
-        "重複を除き、ページ番号の昇順で整列した最終目次を、"
-        "指定されたJSON形式（items: list of {title, page, level}）のみで答えてください。"
+        "# 役割\n"
+        "あなたは、サイズ制限で複数ブロックに分割して取得した部分目次を、1つにまとめるアシスタントです。\n\n"
+        "# 出力フォーマット\n"
+        "以下の構造を持つJSONのみを出力してください（説明文や挨拶は一切不要です）。\n"
+        '{"items": [{"title": "見出し", "page": ページ番号（1始まりの通し）, "level": 階層レベル（1〜6）}]}\n\n'
+        "# マージルール\n"
+        "1. **重複の除去**: 同一またはほぼ同一の見出しが複数ブロックに含まれる場合は、1件にまとめてください。\n"
+        "2. **並び順**: ページ番号（page）の昇順で整列した目次にしてください。\n"
+        "3. **ページ番号**: 入力の各ブロックは既に「元PDFの通しページ番号」で補正済みです。その値をそのまま使用してください。\n"
+        "4. **階層の保持**: 各項目の level（1=章, 2=節, 3=項...）は、部分目次で得られた値を維持してください。\n"
+        "5. **形式の統一**: 図表タイトルや説明用の行は含めず、見出し構造のみの items にしてください。"
     )
     parts_text = []
     for i, block in enumerate(partial_tocs_with_info):
@@ -184,6 +238,15 @@ async def _merge_partial_tocs_with_llm(
         stream=False,
         response_format=TocResponse,
     )
+    try:
+        cost = completion_cost(completion_response=response)
+        logger.info(
+            "LLM cost (toc merge): model=%s cost_usd=%.6f",
+            model_string,
+            float(cost or 0),
+        )
+    except Exception as cost_err:
+        logger.warning("LLM cost logging failed: %s", cost_err, exc_info=True)
     if not response.choices or not response.choices[0].message.content:
         return {"items": []}
     return _parse_toc_response(response.choices[0].message.content.strip())
@@ -210,55 +273,67 @@ async def extract_toc_with_llm(
         os.environ[env_key] = api_key
 
     system_prompt = (
-        "あなたはPDFから目次を抽出するアシスタントです。"
-        "見出し（章・節・項など）とそのページ番号を階層レベル付きで抽出し、"
-        "指定されたJSON形式のみで答えてください。"
-        "ページ番号は1始まりの整数にしてください。"
-        "目次らしきものが見つからない場合は空のitemsで返してください。"
+        "# 役割\n"
+        "あなたはアップロードされたPDFを全ページ解析し、その構成（目次）を抽出するアシスタントです。\n\n"
+        "# 出力フォーマット\n"
+        "以下の構造を持つJSONのみを出力してください（説明文や挨拶は一切不要です）。\n"
+        '{"items": [{"title": "見出し（章・節・項の名称）", "page": PDF上の実ページ番号（1始まりの通し）, "level": 階層レベル（数値）}]}\n\n'
+        "# 抽出・解析ルール\n"
+        "1. **全ページのスキャン**: テキストが含まれる場合はそれを優先し、テキストがない（画像・スキャン）場合は画像解析を用いて、全ページの見出しを特定してください。\n"
+        "2. **階層の定義**: 最上位（Part、部、第〇章など）を level: 1、その下の節（1.1、第一節など）を level: 2、さらに下の項（1.1.1など）を level: 3 としてください。\n"
+        "3. **ページ番号**: 本文の印刷ページ番号ではなく、PDFビューアで表示される「ファイル先頭からの通し番号」を page に記載してください。\n"
+        "4. **目次ページの扱い**: PDF内に「目次」ページがある場合は、そこからはページ情報を読まず、続く本文ページから直接内容とページを読み取ってください。\n"
+        "5. **精度**: 途中を省略せず最終ページまで確認し、網羅的な目次にしてください。図表のタイトルは含めず、文章の構造を示す見出しのみを抽出してください。\n"
+        "目次らしきものが見つからない場合は空の items で返してください。"
     )
     user_text_prompt = (
-        "このPDFの目次を抽出し、"
-        "各項目について title（見出し）, page（ページ番号）, level（1=章, 2=節, 3=項...）"
-        "を持つJSON形式で返してください。"
+        "このPDFを全ページ解析し、上記のルールに従って構成（目次）を抽出し、"
+        "指定のJSON形式のみで出力してください。"
     )
     use_pdf_input = supports_pdf_input(model=model_string)
 
-    file_size = pdf_path.stat().st_size
-    if file_size > SPLIT_THRESHOLD_BYTES:
-        num_chunks = math.ceil(file_size / CHUNK_MAX_BYTES)
-        chunks, temp_dir = _split_pdf_into_chunks(pdf_path, num_chunks)
-        try:
+    # 各処理の前にプロパティ・未使用オブジェクトを削除したPDFを用意する
+    cleaned_path = _clean_pdf(pdf_path)
+    try:
+        file_size = cleaned_path.stat().st_size
+        # オーバーヘッド考慮して10%増やして判定
+        if file_size * 1.1 > SPLIT_THRESHOLD_BYTES:
+            num_chunks = math.ceil(file_size / CHUNK_MAX_BYTES)
+            chunks, temp_dir = _split_pdf_into_chunks(cleaned_path, num_chunks)
             try:
-                partial_tocs_with_info: list[dict] = []
-                for chunk_path, start_page_1based in chunks:
-                    toc = await _extract_toc_single(
-                        chunk_path,
-                        model_string,
-                        system_prompt,
-                        user_text_prompt,
-                        use_pdf_input,
+                try:
+                    partial_tocs_with_info: list[dict] = []
+                    for chunk_path, start_page_1based in chunks:
+                        toc = await _extract_toc_single(
+                            chunk_path,
+                            model_string,
+                            system_prompt,
+                            user_text_prompt,
+                            use_pdf_input,
+                        )
+                        items = toc.get("items", [])
+                        for item in items:
+                            item["page"] = item["page"] + (start_page_1based - 1)
+                        partial_tocs_with_info.append(
+                            {"start_page_1based": start_page_1based, "items": items}
+                        )
+                    return await _merge_partial_tocs_with_llm(
+                        partial_tocs_with_info, model_string
                     )
-                    items = toc.get("items", [])
-                    for item in items:
-                        item["page"] = item["page"] + (start_page_1based - 1)
-                    partial_tocs_with_info.append(
-                        {"start_page_1based": start_page_1based, "items": items}
-                    )
-                return await _merge_partial_tocs_with_llm(
-                    partial_tocs_with_info, model_string
+                except Exception as e:
+                    raise RuntimeError(f"LLM目次抽出エラー: {e!s}") from e
+            finally:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+        else:
+            try:
+                return await _extract_toc_single(
+                    cleaned_path,
+                    model_string,
+                    system_prompt,
+                    user_text_prompt,
+                    use_pdf_input,
                 )
             except Exception as e:
                 raise RuntimeError(f"LLM目次抽出エラー: {e!s}") from e
-        finally:
-            shutil.rmtree(temp_dir, ignore_errors=True)
-    else:
-        try:
-            return await _extract_toc_single(
-                pdf_path,
-                model_string,
-                system_prompt,
-                user_text_prompt,
-                use_pdf_input,
-            )
-        except Exception as e:
-            raise RuntimeError(f"LLM目次抽出エラー: {e!s}") from e
+    finally:
+        cleaned_path.unlink(missing_ok=True)
