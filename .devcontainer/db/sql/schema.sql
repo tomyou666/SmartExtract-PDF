@@ -7,6 +7,7 @@ CREATE TABLE pdfs (
     id SERIAL PRIMARY KEY,
     filename VARCHAR(255) NOT NULL,
     storage_path VARCHAR(512) NOT NULL UNIQUE,
+    toc_json JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

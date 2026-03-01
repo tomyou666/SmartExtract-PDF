@@ -1,3 +1,4 @@
+import json
 import uuid
 from pathlib import Path
 from urllib.parse import quote
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_db
 from app.schemas.pdf import PdfOut
+from app.services.toc import extract_toc_with_llm
 
 router = APIRouter(prefix="/api/pdfs", tags=["pdfs"])
 
@@ -69,6 +71,59 @@ async def delete_pdf(
         path.unlink()
     await db.execute(text("DELETE FROM pdfs WHERE id = :id"), {"id": pdf_id})
     await db.commit()
+
+
+@router.post("/{pdf_id}/toc")
+async def generate_pdf_toc(
+    pdf_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    指定したPDFをLLMに渡して目次を抽出し、DBに保存してJSONで返す。
+    """
+    result = await db.execute(
+        text("SELECT id, storage_path FROM pdfs WHERE id = :id"),
+        {"id": pdf_id},
+    )
+    row = result.mappings().one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="PDF not found")
+    path = Path(row["storage_path"])
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="PDF file not found on disk")
+    try:
+        toc_json = await extract_toc_with_llm(path, db)
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    await db.execute(
+        text("UPDATE pdfs SET toc_json = :toc WHERE id = :id"),
+        {"id": pdf_id, "toc": _json_dump(toc_json)},
+    )
+    await db.commit()
+    return toc_json
+
+
+def _json_dump(obj):
+    return json.dumps(obj, ensure_ascii=False)
+
+
+@router.get("/{pdf_id}/toc")
+async def get_pdf_toc(
+    pdf_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """保存済みの目次JSONを返す。未生成の場合は404。"""
+    result = await db.execute(
+        text("SELECT id, toc_json FROM pdfs WHERE id = :id"),
+        {"id": pdf_id},
+    )
+    row = result.mappings().one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="PDF not found")
+    toc_json = row["toc_json"]
+    if toc_json is None:
+        raise HTTPException(status_code=404, detail="目次が未生成です。POST /api/pdfs/{pdf_id}/toc で生成してください。")
+    return toc_json
 
 
 @router.get("/{pdf_id}")
