@@ -275,6 +275,7 @@ async def _stream_chat(session_id: str, messages: list, db: AsyncSession):
             messages=litellm_messages,
             stream=True,
             stream_options={"include_usage": True},
+            reasoning_effort="none",
         )
         async for chunk in response:
             if getattr(chunk, "usage", None) and (
@@ -439,6 +440,7 @@ async def generate_session_title(
             model=model_string,
             messages=[{"role": "user", "content": prompt}],
             stream=False,
+            reasoning_effort="none",
         )
         try:
             cost = completion_cost(completion_response=response)
