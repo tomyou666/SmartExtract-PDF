@@ -20,6 +20,7 @@ import '@react-pdf-viewer/zoom/lib/styles/index.css';
 
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
+import { TocPanel } from '@/components/TocPanel';
 import { PdfSidebarContext } from '@/contexts/PdfSidebarContext';
 import { API_BASE } from '@/lib/utils';
 import { toolbarSyncPlugin } from '@/plugins/toolbarSyncPlugin';
@@ -34,6 +35,9 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 	const [containerHeight, setContainerHeight] = useState(0);
 	const setViewerApi = usePdfViewerStore((s) => s.setViewerApi);
 	const reset = usePdfViewerStore((s) => s.reset);
+	const setHasEmbeddedOutline = usePdfViewerStore(
+		(s) => s.setHasEmbeddedOutline,
+	);
 	const setSlots = useContext(PdfSidebarContext).setSlots;
 
 	// example に合わせてトップレベルで呼ぶ（useMemo 内で呼ぶとプラグイン内のフックが Rules of Hooks に違反する）
@@ -46,6 +50,13 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 	const thumbnail = thumbnailPlugin();
 	const bookmark = bookmarkPlugin();
 	const syncPlugin = toolbarSyncPlugin();
+
+	const zoomRef = useRef(zoom);
+	const pageNavRef = useRef(pageNav);
+	const fullScreenRef = useRef(fullScreen);
+	zoomRef.current = zoom;
+	pageNavRef.current = pageNav;
+	fullScreenRef.current = fullScreen;
 
 	useLayoutEffect(() => {
 		const el = containerRef.current;
@@ -66,31 +77,37 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 		};
 	}, [setViewerApi, reset]);
 
-	// プラグインは毎レンダーで新しくなるため、viewerApi だけ別 effect で更新（reset は呼ばない）
+	// プラグインは毎レンダーで新しくなるため ref に保持し、effect は mount 時のみ setViewerApi を呼ぶ（無限ループ防止）
 	useEffect(() => {
 		setViewerApi({
-			zoomTo: (scale) => zoom.zoomTo(scale),
-			jumpToPage: (pageIndex) => pageNav.jumpToPage(pageIndex),
-			jumpToNextPage: () => pageNav.jumpToNextPage(),
-			jumpToPreviousPage: () => pageNav.jumpToPreviousPage(),
-			fullScreenPlugin: fullScreen,
+			zoomTo: (scale) => zoomRef.current.zoomTo(scale),
+			jumpToPage: (pageIndex) => pageNavRef.current.jumpToPage(pageIndex),
+			jumpToNextPage: () => pageNavRef.current.jumpToNextPage(),
+			jumpToPreviousPage: () => pageNavRef.current.jumpToPreviousPage(),
+			fullScreenPlugin: fullScreenRef.current,
 		});
 		return () => setViewerApi(null);
-	}, [zoom, pageNav, fullScreen, setViewerApi]);
+	}, [setViewerApi]);
 
 	const url = pdfId ? `${API_BASE}/api/pdfs/${pdfId}` : null;
 
+	// url/pdfId が変わったときだけスロットを更新。bookmark/thumbnail を依存に含めると setSlots の無限ループになる
+	// biome-ignore lint/correctness/useExhaustiveDependencies: 上記の理由で bookmark/thumbnail を意図的に除外
 	useEffect(() => {
 		if (!url) {
 			setSlots(null);
+			setHasEmbeddedOutline(null);
 			return;
 		}
+		setHasEmbeddedOutline(null);
 		setSlots({
 			thumbnails: <thumbnail.Thumbnails />,
-			bookmarks: <bookmark.Bookmarks />,
+			bookmarks: (
+				<TocPanel pdfId={pdfId} bookmarksSlot={<bookmark.Bookmarks />} />
+			),
 		});
 		return () => setSlots(null);
-	}, [url, setSlots]);
+	}, [url, pdfId, setSlots, setHasEmbeddedOutline]);
 
 	if (!url) {
 		return (

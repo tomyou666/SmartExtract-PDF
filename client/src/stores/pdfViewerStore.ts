@@ -30,6 +30,8 @@ interface PdfViewerState {
 	selectionRects: SelectionRect[];
 	selectionMode: boolean;
 	isDrawingMode: boolean;
+	/** PDF埋め込みアウトラインの有無。null=未判定、true=あり、false=なし */
+	hasEmbeddedOutline: boolean | null;
 
 	setViewerApi: (api: PdfViewerApi | null) => void;
 	setViewerContainerRef: (ref: RefObject<HTMLDivElement | null> | null) => void;
@@ -41,6 +43,7 @@ interface PdfViewerState {
 	clearSelectionRects: () => void;
 	setSelectionMode: (on: boolean) => void;
 	setDrawingMode: (on: boolean) => void;
+	setHasEmbeddedOutline: (v: boolean | null) => void;
 	reset: () => void;
 }
 
@@ -54,6 +57,7 @@ const initialState = {
 	selectionRects: [] as SelectionRect[],
 	selectionMode: false,
 	isDrawingMode: false,
+	hasEmbeddedOutline: null as boolean | null,
 };
 
 export const usePdfViewerStore = create<PdfViewerState>((set) => ({
@@ -89,11 +93,13 @@ export const usePdfViewerStore = create<PdfViewerState>((set) => ({
 	clearSelectionRects: () => set({ selectionRects: [] }),
 	setSelectionMode: (selectionMode) => set({ selectionMode }),
 	setDrawingMode: (isDrawingMode) => set({ isDrawingMode }),
+	setHasEmbeddedOutline: (hasEmbeddedOutline) => set({ hasEmbeddedOutline }),
 	reset: () =>
 		set({
 			...initialState,
 			viewerApi: null,
 			pageCanvases: new Map(),
 			selectionRects: [],
+			hasEmbeddedOutline: null,
 		}),
 }));

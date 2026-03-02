@@ -40,6 +40,15 @@ export function toolbarSyncPlugin(): Plugin {
 		},
 		onDocumentLoad(props) {
 			usePdfViewerStore.setState({ numPages: props.doc.numPages });
+			props.doc
+				.getOutline()
+				.then((outline) => {
+					const has = Array.isArray(outline) && outline.length > 0;
+					usePdfViewerStore.getState().setHasEmbeddedOutline(has);
+				})
+				.catch(() => {
+					usePdfViewerStore.getState().setHasEmbeddedOutline(false);
+				});
 		},
 		onCanvasLayerRender(props) {
 			usePdfViewerStore.getState().setPageCanvas(props.pageIndex, props.ele);
