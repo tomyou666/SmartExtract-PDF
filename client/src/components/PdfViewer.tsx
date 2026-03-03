@@ -25,6 +25,7 @@ import { PdfSidebarContext } from '@/contexts/PdfSidebarContext';
 import { API_BASE } from '@/lib/utils';
 import { toolbarSyncPlugin } from '@/plugins/toolbarSyncPlugin';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
+import { useThemeStore } from '@/stores/themeStore';
 
 interface PdfViewerProps {
 	pdfId: string | null;
@@ -39,6 +40,7 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 		(s) => s.setHasEmbeddedOutline,
 	);
 	const setSlots = useContext(PdfSidebarContext).setSlots;
+	const theme = useThemeStore((s) => s.theme);
 
 	// example に合わせてトップレベルで呼ぶ（useMemo 内で呼ぶとプラグイン内のフックが Rules of Hooks に違反する）
 	const zoom = zoomPlugin();
@@ -131,7 +133,7 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 				}}
 			>
 				<Worker workerUrl={workerSrc}>
-					<Viewer fileUrl={url} plugins={plugins} />
+					<Viewer fileUrl={url} plugins={plugins} theme={theme} />
 				</Worker>
 			</div>
 		</div>

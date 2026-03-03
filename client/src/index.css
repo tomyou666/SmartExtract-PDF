@@ -3,18 +3,59 @@
 @source "../node_modules/streamdown/dist/*.js";
 
 @theme {
-	--color-background: oklch(1 0 0);
-	--color-foreground: oklch(0.145 0 0);
-	--color-muted: oklch(0.97 0 0);
-	--color-muted-foreground: oklch(0.45 0 0);
-	--color-border: oklch(0.92 0 0);
-	--color-accent: oklch(0.96 0 0);
-	--color-accent-foreground: oklch(0.205 0 0);
-	--color-primary: oklch(0.35 0.12 265);
-	--color-primary-foreground: oklch(0.985 0 0);
-	--color-destructive: oklch(0.55 0.2 25);
-	--color-destructive-foreground: oklch(0.985 0 0);
-	--color-secondary: oklch(0.96 0 0);
-	--color-secondary-foreground: oklch(0.205 0 0);
-	--color-ring: oklch(0.35 0.12 265);
+	/* GitHub light を意識した明るいテーマ */
+	--color-background: #ffffff;
+	--color-foreground: #24292f;
+	--color-muted: #f6f8fa;
+	--color-muted-foreground: #57606a;
+	--color-border: #d0d7de;
+	--color-accent: #f6f8fa;
+	--color-accent-foreground: #24292f;
+	--color-primary: #0969da;
+	--color-primary-foreground: #ffffff;
+	--color-destructive: #cf222e;
+	--color-destructive-foreground: #ffffff;
+	--color-secondary: #f6f8fa;
+	--color-secondary-foreground: #24292f;
+	--color-ring: #0969da;
+}
+
+:root[data-theme="dark"] {
+	/* GitHub dark を意識したダークテーマ */
+	--color-background: #0d1117;
+	--color-foreground: #c9d1d9;
+	--color-muted: #151b23;
+	--color-muted-foreground: #8b949e;
+	--color-border: #30363d;
+	--color-accent: #151b23;
+	--color-accent-foreground: #e6edf3;
+	--color-primary: #1f6feb;
+	--color-primary-foreground: #f0f6fc;
+	--color-destructive: #f85149;
+	--color-destructive-foreground: #f0f6fc;
+	--color-secondary: #151b23;
+	--color-secondary-foreground: #e6edf3;
+	--color-ring: #1f6feb;
+}
+
+/* スクロールバーのスタイル（Firefox） */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-border) var(--color-muted);
+}
+
+/* スクロールバーのスタイル（WebKit 系ブラウザ） */
+*::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+	background-color: var(--color-muted);
+}
+
+*::-webkit-scrollbar-thumb {
+	background-color: var(--color-border);
+	border-radius: 9999px;
+	border: 2px solid var(--color-muted);
 }

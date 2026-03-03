@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { API_BASE } from '@/lib/utils';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface BottomBarProps {
 	pdfId: string | null;
@@ -81,6 +82,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 				</Button>
 			</div>
 			<div className='flex items-center gap-1'>
+				<ThemeToggle />
 				{EnterFullScreen ? (
 					<EnterFullScreen>
 						{(props: RenderEnterFullScreenProps) => (
