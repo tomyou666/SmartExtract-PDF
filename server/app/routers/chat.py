@@ -114,7 +114,7 @@ async def list_messages(
     sid = _parse_session_id(session_id)
     result = await db.execute(
         text(
-            "SELECT id, session_id, role, content_json, created_at FROM chat_messages WHERE session_id = :sid ORDER BY created_at"
+            "SELECT id, session_id, role, content_json, created_at FROM chat_messages WHERE session_id = :sid ORDER BY created_at, CASE role WHEN 'user' THEN 0 WHEN 'assistant' THEN 1 ELSE 2 END"
         ),
         {"sid": str(sid)},
     )
@@ -168,7 +168,7 @@ async def delete_conversation_turn(
     # セッション内のメッセージを created_at 順で取得（id, role のみ）
     order_result = await db.execute(
         text(
-            "SELECT id, role FROM chat_messages WHERE session_id = :sid ORDER BY created_at"
+            "SELECT id, role FROM chat_messages WHERE session_id = :sid ORDER BY created_at, CASE role WHEN 'user' THEN 0 WHEN 'assistant' THEN 1 ELSE 2 END"
         ),
         {"sid": str(sid)},
     )
@@ -386,7 +386,7 @@ async def post_message_stream(
     if len(request_messages) <= 1:
         hist_result = await db.execute(
             text(
-                "SELECT role, content_json FROM chat_messages WHERE session_id = :sid ORDER BY created_at"
+                "SELECT role, content_json FROM chat_messages WHERE session_id = :sid ORDER BY created_at, CASE role WHEN 'user' THEN 0 WHEN 'assistant' THEN 1 ELSE 2 END"
             ),
             {"sid": str(sid)},
         )
