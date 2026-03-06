@@ -1,8 +1,10 @@
 import type { Plugin } from '@react-pdf-viewer/core';
 import type { RefObject } from 'react';
-import { useEffect } from 'react';
-import { createElement, Fragment } from 'react';
+import { createElement, Fragment, useEffect } from 'react';
+import { OcrTextLayer } from '@/components/OcrTextLayer';
 import { SelectionOverlay } from '@/components/SelectionOverlay';
+import { getOcrCache, setOcrCache } from '@/lib/ocrCache';
+import { getOcrQueue } from '@/lib/ocrWorkerClient';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
 
 /**
@@ -40,6 +42,7 @@ export function toolbarSyncPlugin(): Plugin {
 		},
 		onDocumentLoad(props) {
 			usePdfViewerStore.setState({ numPages: props.doc.numPages });
+			usePdfViewerStore.getState().setPdfDoc(props.doc);
 			props.doc
 				.getOutline()
 				.then((outline) => {
@@ -52,6 +55,56 @@ export function toolbarSyncPlugin(): Plugin {
 		},
 		onCanvasLayerRender(props) {
 			usePdfViewerStore.getState().setPageCanvas(props.pageIndex, props.ele);
+			(async () => {
+				const {
+					pdfId,
+					pdfDoc,
+					pageIndex: visiblePage,
+				} = usePdfViewerStore.getState();
+				if (!pdfId || !pdfDoc) return;
+				const pageIndex = props.pageIndex;
+				const key = `${pdfId}:${pageIndex}`;
+				const cached = await getOcrCache(pdfId, pageIndex);
+				if (cached) {
+					if (cached.lines?.length || cached.hasEmbeddedText) {
+						usePdfViewerStore.getState().setOcrResult(key, {
+							lines: cached.lines ?? [],
+							hasEmbeddedText: cached.hasEmbeddedText,
+						});
+					}
+					return;
+				}
+				try {
+					const page = await pdfDoc.getPage(pageIndex);
+					const content = await page.getTextContent();
+					if (content.items.length > 0) {
+						await setOcrCache(pdfId, pageIndex, {
+							lines: [],
+							hasEmbeddedText: true,
+						});
+						usePdfViewerStore.getState().setOcrResult(key, {
+							lines: [],
+							hasEmbeddedText: true,
+						});
+						return;
+					}
+				} catch {
+					// proceed to OCR
+				}
+				const canvas = props.ele as HTMLCanvasElement;
+				const ctx = canvas?.getContext('2d');
+				if (!ctx) return;
+				const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+				const queue = getOcrQueue();
+				queue.setVisiblePage(pdfId, visiblePage);
+				queue.enqueue({
+					id: `${pdfId}:${pageIndex}:layoutAndOcr`,
+					type: 'layoutAndOcr',
+					pdfId,
+					pageIndex,
+					imageData,
+				});
+			})();
 		},
 		renderViewer(props) {
 			const slot = props.slot;
@@ -68,6 +121,7 @@ export function toolbarSyncPlugin(): Plugin {
 							pagesContainerRef: props.pagesContainerRef,
 						}),
 						subSlot.children,
+						createElement(OcrTextLayer),
 						createElement(SelectionOverlay),
 					),
 				},

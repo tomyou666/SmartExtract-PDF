@@ -6,6 +6,7 @@ import {
 	Trash2,
 	Copy,
 	SquarePlus,
+	ScanSearch,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
@@ -15,6 +16,7 @@ import {
 	getSelectionImageDataUrl,
 	copyImageDataUrlToClipboard,
 } from '@/lib/pdfImage';
+import { getLayoutForPage } from '@/lib/autoSelection';
 
 interface PdfImageToolbarProps {
 	pdfId: string | null;
@@ -30,7 +32,14 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 	const setDrawingMode = usePdfViewerStore((s) => s.setDrawingMode);
 	const addSelectionRect = usePdfViewerStore((s) => s.addSelectionRect);
 	const clearSelectionRects = usePdfViewerStore((s) => s.clearSelectionRects);
+	const lastAutoOrderedRectsByPage = usePdfViewerStore(
+		(s) => s.lastAutoOrderedRectsByPage,
+	);
+	const setLastAutoOrderedRects = usePdfViewerStore(
+		(s) => s.setLastAutoOrderedRects,
+	);
 	const addImage = useChatImageStore((s) => s.addImage);
+	const [autoSelecting, setAutoSelecting] = useState(false);
 
 	const addCurrentPageAsImage = () => {
 		const url = getCurrentPageImageDataUrl(pageCanvases, pageIndex);
@@ -63,6 +72,29 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 		const x = Math.max(0, (canvas.width - defaultW) / 2);
 		const y = Math.max(0, (canvas.height - defaultH) / 2);
 		addSelectionRect({ pageIndex, x, y, w: defaultW, h: defaultH });
+	};
+
+	const runAutoSelection = async () => {
+		const cached = lastAutoOrderedRectsByPage[pageIndex];
+		if (cached?.length) {
+			clearSelectionRects();
+			for (const r of cached) addSelectionRect(r);
+			return;
+		}
+		const canvas = pageCanvases.get(pageIndex);
+		if (!canvas || !pdfId) return;
+		setAutoSelecting(true);
+		try {
+			const ctx = canvas.getContext('2d');
+			if (!ctx) return;
+			const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+			const rects = await getLayoutForPage(pdfId, pageIndex, imageData);
+			setLastAutoOrderedRects(pageIndex, rects);
+			clearSelectionRects();
+			for (const r of rects) addSelectionRect(r);
+		} finally {
+			setAutoSelecting(false);
+		}
 	};
 
 	const copySelectionToClipboard = async () => {
@@ -118,6 +150,15 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 						>
 							<ListOrdered className='mr-1 h-3 w-3' />
 							現在のページを選択に追加
+						</Button>
+						<Button
+							variant='outline'
+							size='sm'
+							onClick={runAutoSelection}
+							disabled={autoSelecting}
+						>
+							<ScanSearch className='mr-1 h-3 w-3' />
+							{autoSelecting ? '検出中…' : '自動矩形選択'}
 						</Button>
 					</div>
 					{selectionRects.length > 0 && (

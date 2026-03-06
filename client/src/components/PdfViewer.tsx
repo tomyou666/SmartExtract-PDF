@@ -35,10 +35,16 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [containerHeight, setContainerHeight] = useState(0);
 	const setViewerApi = usePdfViewerStore((s) => s.setViewerApi);
+	const setPdfId = usePdfViewerStore((s) => s.setPdfId);
 	const reset = usePdfViewerStore((s) => s.reset);
 	const setHasEmbeddedOutline = usePdfViewerStore(
 		(s) => s.setHasEmbeddedOutline,
 	);
+
+	useEffect(() => {
+		setPdfId(pdfId);
+		return () => setPdfId(null);
+	}, [pdfId, setPdfId]);
 	const setSlots = useContext(PdfSidebarContext).setSlots;
 	const theme = useThemeStore((s) => s.theme);
 

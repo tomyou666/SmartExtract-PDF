@@ -106,4 +106,11 @@ cd client && bun install && bun run dev
 
 ## ライセンス
 
-MIT
+- 本リポジトリで新規に作成したコード一式のライセンスは **MIT** です。
+- ただし、PDF ビューアの **レイアウト認識（DEIM）・文字認識（PARSeq）・読み順整序** 機能の一部実装は、  
+  国立国会図書館 NDL ラボが CC BY 4.0 ライセンスで公開している **「NDLOCR-Liteアプリケーションのリポジトリ」**  
+ （`https://github.com/ndl-lab/ndlocr-lite`）を参考にしており、同ライセンスに基づくクレジット表記を行います。
+  - 原著作物: 国立国会図書館 NDL ラボ「NDLOCR-Liteアプリケーションのリポジトリ」
+  - ライセンス: Creative Commons Attribution 4.0 International (CC BY 4.0)  
+    `https://creativecommons.org/licenses/by/4.0/deed.ja`  
+    （ライセンス全文および依存ライブラリのライセンス一覧は、上記リポジトリ側の `LICENCE` / `LICENCE_DEPENDENCEIES` を参照してください）
