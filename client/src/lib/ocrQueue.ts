@@ -3,7 +3,9 @@
  * 表示中のページを優先し、同時実行数を制限。requestIdleCallback でバックグラウンド処理。
  */
 
-export type OcrTaskType = 'layout' | 'layoutAndOcr';
+import type { LayoutCacheValue } from './ocrCache';
+
+export type OcrTaskType = 'layout' | 'layoutAndOcr' | 'ocrFromLayoutCache';
 
 export interface OcrTask {
 	id: string;
@@ -11,6 +13,8 @@ export interface OcrTask {
 	pdfId: string;
 	pageIndex: number;
 	imageData: ImageData;
+	/** ocrFromLayoutCache のときのみ。layout キャッシュの DEIM 検出結果。 */
+	cachedLayout?: LayoutCacheValue;
 }
 
 export interface LayoutResult {
@@ -24,12 +28,23 @@ export interface OcrLineResult {
 	text: string;
 }
 
+/** layoutAndOcr の結果で layout キャッシュに保存するための DEIM 結果 */
+export interface LayoutCachePayload {
+	detections: LayoutCacheValue['detections'];
+	imageWidth: number;
+	imageHeight: number;
+	paddedWidth?: number;
+	paddedHeight?: number;
+}
+
 export interface OcrTaskResult {
 	pdfId: string;
 	pageIndex: number;
 	type: OcrTaskType;
 	orderedRects?: Array<{ x: number; y: number; w: number; h: number }>;
 	lines?: OcrLineResult[];
+	/** layoutAndOcr 時に layout キャッシュ保存用 */
+	layoutCachePayload?: LayoutCachePayload;
 }
 
 const MAX_CONCURRENT = 3;
@@ -38,6 +53,7 @@ const IDLE_DEADLINE_MS = 2;
 type TaskHandler = (task: OcrTask) => Promise<{
 	orderedRects?: LayoutResult['orderedRects'];
 	lines?: OcrLineResult[];
+	layoutCachePayload?: LayoutCachePayload;
 }>;
 
 export interface OcrQueueOptions {
@@ -126,6 +142,7 @@ export function createOcrQueue(options: OcrQueueOptions) {
 				type: task.type,
 				orderedRects: result.orderedRects,
 				lines: result.lines,
+				layoutCachePayload: result.layoutCachePayload,
 			});
 		} catch (err) {
 			onError?.(task, err);

@@ -282,27 +282,57 @@ function buildOrderedRectsFromDetections(
 	return result;
 }
 
-self.onmessage = async (
-	ev: MessageEvent<{
-		type: 'layout' | 'layoutAndOcr';
-		pdfId: string;
-		pageIndex: number;
-		imageData: ImageData;
-	}>,
-) => {
-	const { type, pdfId, pageIndex, imageData } = ev.data;
+type WorkerTask =
+	| {
+			type: 'layout' | 'layoutAndOcr';
+			pdfId: string;
+			pageIndex: number;
+			imageData: ImageData;
+	  }
+	| {
+			type: 'layoutFromCache';
+			pdfId: string;
+			pageIndex: number;
+			detections: DEIMDetection[];
+			imageWidth: number;
+			imageHeight: number;
+			paddedWidth?: number;
+			paddedHeight?: number;
+	  }
+	| {
+			type: 'ocrFromLayoutCache';
+			pdfId: string;
+			pageIndex: number;
+			imageData: ImageData;
+			detections: DEIMDetection[];
+			imageWidth: number;
+			imageHeight: number;
+			paddedWidth?: number;
+			paddedHeight?: number;
+	  };
+
+/** パディング後のサイズ（DEIM 座標系）。未指定時は max(W,H) で同一値。 */
+function getPaddedSize(
+	w: number,
+	h: number,
+): { paddedWidth: number; paddedHeight: number } {
+	const m = Math.max(w, h);
+	return { paddedWidth: m, paddedHeight: m };
+}
+
+self.onmessage = async (ev: MessageEvent<WorkerTask>) => {
+	const payload = ev.data;
+	const { type, pdfId, pageIndex } = payload;
 	try {
-		const [detections, classNames] = await Promise.all([
-			runDeim(imageData),
-			loadNdlClasses(),
-		]);
-		const orderedRects = buildOrderedRectsFromDetections(
-			detections,
-			classNames,
-			imageData.width,
-			imageData.height,
-		);
-		if (type === 'layout') {
+		// layoutFromCache: DEIM は実行せず detections から orderedRects のみ計算
+		if (type === 'layoutFromCache') {
+			const classNames = await loadNdlClasses();
+			const orderedRects = buildOrderedRectsFromDetections(
+				payload.detections,
+				classNames,
+				payload.imageWidth,
+				payload.imageHeight,
+			);
 			self.postMessage({
 				type: 'result',
 				pdfId,
@@ -312,8 +342,92 @@ self.onmessage = async (
 			});
 			return;
 		}
+
+		// ocrFromLayoutCache: DEIM は実行せず detections から行抽出 → PARSEQ のみ
+		if (type === 'ocrFromLayoutCache') {
+			const lineClassIndices = new Set([1, 2, 3, 4, 5, 16]);
+			const lineDetections = payload.detections.filter((d) =>
+				lineClassIndices.has(d.class_index),
+			);
+			if (lineDetections.length === 0) {
+				self.postMessage({
+					type: 'result',
+					pdfId,
+					pageIndex,
+					taskType: type,
+					lines: [],
+				});
+				return;
+			}
+			const lineBboxes: BBox[] = lineDetections.map((d) => {
+				const [x1, y1, x2, y2] = d.box;
+				return [x1, y1, x2, y2];
+			});
+			const lineRanks = xyCutSolve(lineBboxes);
+			const sortedLines = sortBboxesByRank(
+				lineBboxes,
+				lineDetections,
+				lineRanks,
+			);
+			const imageData = payload.imageData;
+			const lines: Array<{
+				bbox: { x: number; y: number; w: number; h: number };
+				text: string;
+			}> = [];
+			for (const det of sortedLines) {
+				const [x1, y1, x2, y2] = det.box;
+				const lineImg = cropImageData(imageData, x1, y1, x2 - x1, y2 - y1);
+				const text = await runParseq(lineImg);
+				lines.push({
+					bbox: { x: x1, y: y1, w: x2 - x1, h: y2 - y1 },
+					text,
+				});
+			}
+			self.postMessage({
+				type: 'result',
+				pdfId,
+				pageIndex,
+				taskType: type,
+				lines,
+			});
+			return;
+		}
+
+		// layout / layoutAndOcr: DEIM 実行
+		const imageData = payload.imageData;
+		const [detections, classNames] = await Promise.all([
+			runDeim(imageData),
+			loadNdlClasses(),
+		]);
+		const { paddedWidth, paddedHeight } = getPaddedSize(
+			imageData.width,
+			imageData.height,
+		);
+		const orderedRects = buildOrderedRectsFromDetections(
+			detections,
+			classNames,
+			imageData.width,
+			imageData.height,
+		);
+
+		if (type === 'layout') {
+			self.postMessage({
+				type: 'result',
+				pdfId,
+				pageIndex,
+				taskType: type,
+				orderedRects,
+				detections,
+				imageWidth: imageData.width,
+				imageHeight: imageData.height,
+				paddedWidth,
+				paddedHeight,
+			});
+			return;
+		}
+
 		// layoutAndOcr: line_* を抽出 → XY-cut → PARSEQ で行認識
-		const lineClassIndices = new Set([1, 2, 3, 4, 5, 16]); // line_main, line_caption, ...
+		const lineClassIndices = new Set([1, 2, 3, 4, 5, 16]);
 		const lineDetections = detections.filter((d) =>
 			lineClassIndices.has(d.class_index),
 		);
@@ -325,6 +439,11 @@ self.onmessage = async (
 				taskType: type,
 				orderedRects,
 				lines: [],
+				detections,
+				imageWidth: imageData.width,
+				imageHeight: imageData.height,
+				paddedWidth,
+				paddedHeight,
 			});
 			return;
 		}
@@ -354,12 +473,17 @@ self.onmessage = async (
 			taskType: type,
 			orderedRects,
 			lines,
+			detections,
+			imageWidth: imageData.width,
+			imageHeight: imageData.height,
+			paddedWidth,
+			paddedHeight,
 		});
 	} catch (err) {
 		self.postMessage({
 			type: 'error',
-			pdfId,
-			pageIndex,
+			pdfId: payload.pdfId,
+			pageIndex: payload.pageIndex,
 			taskType: type,
 			error: String(err),
 		});

@@ -3,7 +3,12 @@ import type { RefObject } from 'react';
 import { createElement, Fragment, useEffect } from 'react';
 import { OcrTextLayer } from '@/components/OcrTextLayer';
 import { SelectionOverlay } from '@/components/SelectionOverlay';
-import { getOcrCache, setOcrCache } from '@/lib/ocrCache';
+import {
+	getLayoutCache,
+	getOcrCache,
+	LAYOUT_CACHE_VERSION,
+	setOcrCache,
+} from '@/lib/ocrCache';
 import { getOcrQueue } from '@/lib/ocrWorkerClient';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
 
@@ -95,15 +100,35 @@ export function toolbarSyncPlugin(): Plugin {
 				const ctx = canvas?.getContext('2d');
 				if (!ctx) return;
 				const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+				const layoutCache = await getLayoutCache(pdfId, pageIndex);
+				const useLayoutCache =
+					layoutCache &&
+					layoutCache.version === LAYOUT_CACHE_VERSION &&
+					'detections' in layoutCache &&
+					Array.isArray(layoutCache.detections) &&
+					layoutCache.detections.length > 0 &&
+					layoutCache.imageWidth === imageData.width &&
+					layoutCache.imageHeight === imageData.height;
 				const queue = getOcrQueue();
 				queue.setVisiblePage(pdfId, visiblePage);
-				queue.enqueue({
-					id: `${pdfId}:${pageIndex}:layoutAndOcr`,
-					type: 'layoutAndOcr',
-					pdfId,
-					pageIndex,
-					imageData,
-				});
+				if (useLayoutCache && layoutCache) {
+					queue.enqueue({
+						id: `${pdfId}:${pageIndex}:ocrFromLayoutCache`,
+						type: 'ocrFromLayoutCache',
+						pdfId,
+						pageIndex,
+						imageData,
+						cachedLayout: layoutCache,
+					});
+				} else {
+					queue.enqueue({
+						id: `${pdfId}:${pageIndex}:layoutAndOcr`,
+						type: 'layoutAndOcr',
+						pdfId,
+						pageIndex,
+						imageData,
+					});
+				}
 			})();
 		},
 		renderViewer(props) {

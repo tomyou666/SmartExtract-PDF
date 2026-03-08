@@ -3,9 +3,10 @@
  */
 
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
-import { setLayoutCache, setOcrCache } from './ocrCache';
+import { LAYOUT_CACHE_VERSION, setLayoutCache, setOcrCache } from './ocrCache';
 import {
 	createOcrQueue,
+	type LayoutCachePayload,
 	type LayoutResult,
 	type OcrLineResult,
 	type OcrQueue,
@@ -29,6 +30,7 @@ function getWorker(): Worker {
 function createExecuteTask(): (task: OcrTask) => Promise<{
 	orderedRects?: LayoutResult['orderedRects'];
 	lines?: OcrLineResult[];
+	layoutCachePayload?: LayoutCachePayload;
 }> {
 	const worker = getWorker();
 	let locked = false;
@@ -58,12 +60,18 @@ function createExecuteTask(): (task: OcrTask) => Promise<{
 			return new Promise<{
 				orderedRects?: LayoutResult['orderedRects'];
 				lines?: OcrLineResult[];
+				layoutCachePayload?: LayoutCachePayload;
 			}>((resolve, reject) => {
 				const onMessage = (
 					e: MessageEvent<{
 						type: string;
 						orderedRects?: LayoutResult['orderedRects'];
 						lines?: OcrLineResult[];
+						detections?: LayoutCachePayload['detections'];
+						imageWidth?: number;
+						imageHeight?: number;
+						paddedWidth?: number;
+						paddedHeight?: number;
 						error?: string;
 					}>,
 				) => {
@@ -76,9 +84,22 @@ function createExecuteTask(): (task: OcrTask) => Promise<{
 						return;
 					}
 					if (d?.type === 'result') {
+						const layoutCachePayload: LayoutCachePayload | undefined =
+							Array.isArray(d.detections) &&
+							typeof d.imageWidth === 'number' &&
+							typeof d.imageHeight === 'number'
+								? {
+										detections: d.detections,
+										imageWidth: d.imageWidth,
+										imageHeight: d.imageHeight,
+										paddedWidth: d.paddedWidth,
+										paddedHeight: d.paddedHeight,
+									}
+								: undefined;
 						resolve({
 							orderedRects: d.orderedRects,
 							lines: d.lines,
+							layoutCachePayload,
 						});
 						return;
 					}
@@ -92,21 +113,46 @@ function createExecuteTask(): (task: OcrTask) => Promise<{
 				};
 				worker.addEventListener('message', onMessage);
 				worker.addEventListener('error', onError);
-				worker.postMessage({
-					type: task.type,
-					pdfId: task.pdfId,
-					pageIndex: task.pageIndex,
-					imageData: task.imageData,
-				});
+				if (
+					task.type === 'ocrFromLayoutCache' &&
+					task.cachedLayout &&
+					task.cachedLayout.detections?.length
+				) {
+					worker.postMessage({
+						type: 'ocrFromLayoutCache',
+						pdfId: task.pdfId,
+						pageIndex: task.pageIndex,
+						imageData: task.imageData,
+						detections: task.cachedLayout.detections,
+						imageWidth: task.cachedLayout.imageWidth,
+						imageHeight: task.cachedLayout.imageHeight,
+						paddedWidth: task.cachedLayout.paddedWidth,
+						paddedHeight: task.cachedLayout.paddedHeight,
+					});
+				} else {
+					worker.postMessage({
+						type: task.type,
+						pdfId: task.pdfId,
+						pageIndex: task.pageIndex,
+						imageData: task.imageData,
+					});
+				}
 			});
 		});
 }
 
 function onResult(result: OcrTaskResult): void {
-	const { pdfId, pageIndex, orderedRects, lines } = result;
+	const { pdfId, pageIndex, lines, layoutCachePayload } = result;
 	const key = `${pdfId}:${pageIndex}`;
-	if (orderedRects?.length) {
-		setLayoutCache(pdfId, pageIndex, { orderedRects }).catch(() => {});
+	if (layoutCachePayload) {
+		setLayoutCache(pdfId, pageIndex, {
+			version: LAYOUT_CACHE_VERSION,
+			detections: layoutCachePayload.detections,
+			imageWidth: layoutCachePayload.imageWidth,
+			imageHeight: layoutCachePayload.imageHeight,
+			paddedWidth: layoutCachePayload.paddedWidth,
+			paddedHeight: layoutCachePayload.paddedHeight,
+		}).catch(() => {});
 	}
 	if (lines) {
 		setOcrCache(pdfId, pageIndex, { lines }).catch(() => {});

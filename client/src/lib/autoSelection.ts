@@ -1,5 +1,6 @@
 /**
- * 自動矩形選択: レイアウトキャッシュ取得 or Worker で layout タスク実行し、ブロック矩形リストを返す。
+ * 自動矩形選択: layout キャッシュ（DEIM 検出結果）を参照し、都度 orderedRects を計算する。
+ * キャッシュがなければ Worker で layout を実行してキャッシュに保存する。
  */
 
 import type { SelectionRect } from '@/stores/pdfViewerStore';
@@ -11,10 +12,10 @@ import {
 	type LayoutRect,
 } from './ocrCache';
 
-function runLayoutTask(
+function runLayoutFromCacheTask(
 	pdfId: string,
 	pageIndex: number,
-	imageData: ImageData,
+	cached: LayoutCacheValue,
 ): Promise<LayoutRect[]> {
 	return new Promise((resolve, reject) => {
 		const worker = new Worker(
@@ -31,12 +32,82 @@ function runLayoutTask(
 			const d = e.data;
 			if (d?.type === 'error') {
 				worker.terminate();
-				reject(new Error(d.error ?? 'Layout task failed'));
+				reject(new Error(d.error ?? 'LayoutFromCache task failed'));
 				return;
 			}
 			if (d?.type === 'result' && Array.isArray(d.orderedRects)) {
 				worker.terminate();
 				resolve(d.orderedRects);
+			}
+		};
+		worker.onerror = (err) => {
+			worker.terminate();
+			reject(err);
+		};
+		worker.postMessage({
+			type: 'layoutFromCache',
+			pdfId,
+			pageIndex,
+			detections: cached.detections,
+			imageWidth: cached.imageWidth,
+			imageHeight: cached.imageHeight,
+			paddedWidth: cached.paddedWidth,
+			paddedHeight: cached.paddedHeight,
+		});
+	});
+}
+
+function runLayoutTask(
+	pdfId: string,
+	pageIndex: number,
+	imageData: ImageData,
+): Promise<{
+	orderedRects: LayoutRect[];
+	detections: LayoutCacheValue['detections'];
+	imageWidth: number;
+	imageHeight: number;
+	paddedWidth?: number;
+	paddedHeight?: number;
+}> {
+	return new Promise((resolve, reject) => {
+		const worker = new Worker(
+			new URL('@/workers/ndlocr.worker.ts', import.meta.url),
+			{ type: 'module' },
+		);
+		worker.onmessage = (
+			e: MessageEvent<{
+				type: string;
+				orderedRects?: LayoutRect[];
+				detections?: LayoutCacheValue['detections'];
+				imageWidth?: number;
+				imageHeight?: number;
+				paddedWidth?: number;
+				paddedHeight?: number;
+				error?: string;
+			}>,
+		) => {
+			const d = e.data;
+			if (d?.type === 'error') {
+				worker.terminate();
+				reject(new Error(d.error ?? 'Layout task failed'));
+				return;
+			}
+			if (
+				d?.type === 'result' &&
+				Array.isArray(d.orderedRects) &&
+				Array.isArray(d.detections) &&
+				typeof d.imageWidth === 'number' &&
+				typeof d.imageHeight === 'number'
+			) {
+				worker.terminate();
+				resolve({
+					orderedRects: d.orderedRects,
+					detections: d.detections,
+					imageWidth: d.imageWidth,
+					imageHeight: d.imageHeight,
+					paddedWidth: d.paddedWidth,
+					paddedHeight: d.paddedHeight,
+				});
 			}
 		};
 		worker.onerror = (err) => {
@@ -53,7 +124,8 @@ function runLayoutTask(
 }
 
 /**
- * 指定ページのブロック矩形（読み順付き）を返す。キャッシュにあればそれを使い、なければ Worker で検出してキャッシュに保存する。
+ * 指定ページのブロック矩形（読み順付き）を返す。
+ * キャッシュに detections があれば Worker で都度 orderedRects を計算し、なければ Worker で layout を実行してキャッシュに保存する。
  */
 export async function getLayoutForPage(
 	pdfId: string,
@@ -61,12 +133,16 @@ export async function getLayoutForPage(
 	imageData: ImageData,
 ): Promise<SelectionRect[]> {
 	const cached = await getLayoutCache(pdfId, pageIndex);
-	if (
+	const isNewFormat =
 		cached &&
-		(cached as LayoutCacheValue).version === LAYOUT_CACHE_VERSION &&
-		cached.orderedRects?.length
-	) {
-		return cached.orderedRects.map((r) => ({
+		cached.version === LAYOUT_CACHE_VERSION &&
+		'detections' in cached &&
+		Array.isArray(cached.detections) &&
+		cached.detections.length > 0;
+
+	if (isNewFormat && cached) {
+		const orderedRects = await runLayoutFromCacheTask(pdfId, pageIndex, cached);
+		return orderedRects.map((r) => ({
 			pageIndex,
 			x: r.x,
 			y: r.y,
@@ -74,14 +150,17 @@ export async function getLayoutForPage(
 			h: r.h,
 		}));
 	}
-	const orderedRects = await runLayoutTask(pdfId, pageIndex, imageData);
+
+	const result = await runLayoutTask(pdfId, pageIndex, imageData);
 	await setLayoutCache(pdfId, pageIndex, {
 		version: LAYOUT_CACHE_VERSION,
-		orderedRects,
-		imageWidth: imageData.width,
-		imageHeight: imageData.height,
+		detections: result.detections,
+		imageWidth: result.imageWidth,
+		imageHeight: result.imageHeight,
+		paddedWidth: result.paddedWidth,
+		paddedHeight: result.paddedHeight,
 	});
-	return orderedRects.map((r) => ({
+	return result.orderedRects.map((r) => ({
 		pageIndex,
 		x: r.x,
 		y: r.y,

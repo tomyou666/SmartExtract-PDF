@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import type { DEIMDetection } from '@/lib/ndlocr/deim';
 
 const DB_NAME = 'ndlocr-pdf-cache';
 const DB_VERSION = 1;
@@ -12,14 +13,17 @@ export interface LayoutRect {
 	h: number;
 }
 
-/** 座標系修正（scaleY・クリップ）を行った結果のみキャッシュを利用する */
-export const LAYOUT_CACHE_VERSION = 2;
+/** layout キャッシュは DEIM の検出結果（detections）を保存。version 3 で detections 必須。 */
+export const LAYOUT_CACHE_VERSION = 3;
 
 export interface LayoutCacheValue {
 	version?: number;
-	orderedRects: LayoutRect[];
-	imageWidth?: number;
-	imageHeight?: number;
+	/** DEIM の実行結果。半自動矩形選択・OCR の両方で利用。座標はパディング座標系。 */
+	detections: DEIMDetection[];
+	imageWidth: number;
+	imageHeight: number;
+	paddedWidth?: number;
+	paddedHeight?: number;
 }
 
 export interface OcrLine {
