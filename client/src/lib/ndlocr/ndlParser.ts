@@ -138,83 +138,6 @@ export function isInBlockAd(
 	return lineArea > 0 && interArea / lineArea > 0.8;
 }
 
-/**
- * 各 line_* の中心がどの text_block ポリゴン内にあるかで tb_info を埋める。
- * 戻り値: tb_info, ad_info, table_info, independ_lines
- */
-export function getRelationshipRect(
-	detectionsByClass: Map<
-		number,
-		Array<{ box: [number, number, number, number]; conf: number }>
-	>,
-	tbPolygons: Polygon[],
-	classNames: string[],
-	scoreThr: number,
-): {
-	tbInfo: Array<Array<[number, number]> | null>;
-	adInfo: Array<Array<[number, number]>>;
-	tableInfo: Array<Array<[number, number]>>;
-	independLines: Array<[number, number]>;
-} {
-	const tbInfo: Array<Array<[number, number]> | null> = tbPolygons.map(
-		() => [],
-	);
-	const adInfo: Array<Array<[number, number]>> = [];
-	const tableInfo: Array<Array<[number, number]>> = [];
-	const baClsId = classNames.indexOf('block_ad');
-	const tableClsId = classNames.indexOf('block_table');
-	const blockAdList = detectionsByClass.get(baClsId) ?? [];
-	const blockTableList = detectionsByClass.get(tableClsId) ?? [];
-	for (let i = 0; i < blockAdList.length; i++) adInfo.push([]);
-	for (let i = 0; i < blockTableList.length; i++) tableInfo.push([]);
-
-	for (let c = 0; c < classNames.length; c++) {
-		const cls = classNames[c];
-		if (!cls?.startsWith('line_')) continue;
-		const lines = detectionsByClass.get(c) ?? [];
-		for (let j = 0; j < lines.length; j++) {
-			const line = lines[j];
-			if (!line || line.conf < scoreThr) continue;
-			const [x0, y0, x1, y1] = line.box;
-			const cx = Math.floor((x0 + x1) / 2);
-			const cy = Math.floor((y0 + y1) / 2);
-			let inAnyBlock = false;
-			for (let i = 0; i < tbPolygons.length; i++) {
-				if (tbInfo[i] === null) continue;
-				const poly = tbPolygons[i];
-				if (!poly) continue;
-				if (pointInPolygon([cx, cy], poly, false) >= 0) {
-					tbInfo[i].push([c, j]);
-					inAnyBlock = true;
-					break;
-				}
-			}
-			if (!inAnyBlock) {
-				for (let i = 0; i < blockAdList.length; i++) {
-					if (isInBlockAd(blockAdList[i].box, line.box)) {
-						adInfo[i].push([c, j]);
-						inAnyBlock = true;
-						break;
-					}
-				}
-			}
-			if (!inAnyBlock) {
-				for (let i = 0; i < blockTableList.length; i++) {
-					if (isInBlockAd(blockTableList[i].box, line.box)) {
-						tableInfo[i].push([c, j]);
-						inAnyBlock = true;
-						break;
-					}
-				}
-			}
-			if (!inAnyBlock) {
-				// independ_lines - store as [c, j] but we don't have a separate list type
-			}
-		}
-	}
-	return { tbInfo, adInfo, tableInfo, independLines: [] };
-}
-
 const REFINE_MARGIN = 50;
 
 /**
@@ -283,11 +206,8 @@ export function buildBlockRectsFromDetections(
 	const tbClsId = classNames.indexOf('text_block');
 	const textBlockBoxes = (byClass.get(tbClsId) ?? []).map((x) => x.box);
 	const tbPolygons = textblockToRect(textBlockBoxes);
-	const { tbInfo } = getRelationshipRect(byClass, tbPolygons, classNames, 0.1);
-	refineTbRelationship(tbPolygons, tbInfo, tbClsId);
 	const blockRects: Array<{ x: number; y: number; w: number; h: number }> = [];
 	for (let j = 0; j < tbPolygons.length; j++) {
-		if (tbInfo[j] === null) continue;
 		const poly = tbPolygons[j];
 		if (!poly) continue;
 		const [x, y, w, h] = makeBboxFromPoly(poly);

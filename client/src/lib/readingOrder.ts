@@ -375,14 +375,7 @@ function sort_nodes(node: BlockNode, bboxes: BBox[]): [number, number] {
  * @param scale 1.0 でそのまま
  * @returns 長さ N の ranks 配列（0,1,2,... の読み順）
  */
-export function solve(
-	bboxes: BBox[],
-	grid?: number,
-	_plotPath?: string,
-	// biome-ignore lint/correctness/noUnusedVariables: optional API compatibility with Python
-	_logger?: unknown,
-	scale = 1.0,
-): number[] {
+export function solve(bboxes: BBox[], grid?: number, scale = 1.0): number[] {
 	if (bboxes.length === 0) return [];
 	const g = grid ?? get_optimal_grid(bboxes);
 	const norm = normalize_bboxes(bboxes, g, scale);
