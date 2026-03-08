@@ -60,6 +60,8 @@ export interface OcrQueueOptions {
 	onResult: (result: OcrTaskResult) => void;
 	onError?: (task: OcrTask, err: unknown) => void;
 	executeTask: TaskHandler;
+	/** 実行中・待機数が変わったときに呼ぶ（UI進捗用） */
+	onStateChange?: (state: { running: number; pending: number }) => void;
 }
 
 function taskKey(pdfId: string, pageIndex: number, type: OcrTaskType): string {
@@ -67,12 +69,16 @@ function taskKey(pdfId: string, pageIndex: number, type: OcrTaskType): string {
 }
 
 export function createOcrQueue(options: OcrQueueOptions) {
-	const { onResult, onError, executeTask } = options;
+	const { onResult, onError, executeTask, onStateChange } = options;
 	const queue: OcrTask[] = [];
 	const pendingKeys = new Set<string>();
 	let visiblePage: { pdfId: string; pageIndex: number } | null = null;
 	let running = 0;
 	let idleScheduled = false;
+
+	function notifyState(): void {
+		onStateChange?.({ running, pending: queue.length });
+	}
 
 	function removeDuplicate(key: string): void {
 		const idx = queue.findIndex(
@@ -87,6 +93,7 @@ export function createOcrQueue(options: OcrQueueOptions) {
 		removeDuplicate(key);
 		pendingKeys.add(key);
 		queue.push(task);
+		notifyState();
 		scheduleProcess();
 	}
 
@@ -134,6 +141,7 @@ export function createOcrQueue(options: OcrQueueOptions) {
 		const key = taskKey(task.pdfId, task.pageIndex, task.type);
 		pendingKeys.delete(key);
 		running += 1;
+		notifyState();
 		try {
 			const result = await executeTask(task);
 			onResult({
@@ -148,6 +156,7 @@ export function createOcrQueue(options: OcrQueueOptions) {
 			onError?.(task, err);
 		} finally {
 			running -= 1;
+			notifyState();
 			scheduleProcess();
 		}
 	}

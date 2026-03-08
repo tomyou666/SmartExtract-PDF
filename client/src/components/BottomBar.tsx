@@ -3,7 +3,9 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Download,
+	Loader2,
 	Maximize,
+	ScanText,
 	ZoomIn,
 	ZoomOut,
 } from 'lucide-react';
@@ -21,6 +23,9 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 	const pageIndex = usePdfViewerStore((s) => s.pageIndex);
 	const scale = usePdfViewerStore((s) => s.scale);
 	const numPages = usePdfViewerStore((s) => s.numPages);
+	const ocrEnabled = usePdfViewerStore((s) => s.ocrEnabled);
+	const setOcrEnabled = usePdfViewerStore((s) => s.setOcrEnabled);
+	const ocrProgress = usePdfViewerStore((s) => s.ocrProgress);
 
 	const currentPage = pageIndex + 1;
 	const pageCount = numPages;
@@ -82,6 +87,23 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 				</Button>
 			</div>
 			<div className='flex items-center gap-1'>
+				{ocrProgress.running > 0 && (
+					<span
+						className='flex items-center text-muted-foreground'
+						title={`OCR実行中: ${ocrProgress.running} ページ`}
+					>
+						<Loader2 className='h-4 w-4 animate-spin' aria-hidden />
+					</span>
+				)}
+				<Button
+					variant='ghost'
+					size='icon'
+					onClick={() => setOcrEnabled(!ocrEnabled)}
+					aria-label={ocrEnabled ? 'OCRをオフにする' : 'OCRをオンにする'}
+					title={ocrEnabled ? 'OCR: オン' : 'OCR: オフ'}
+				>
+					<ScanText className={`h-4 w-4 ${ocrEnabled ? '' : 'opacity-50'}`} />
+				</Button>
 				<ThemeToggle />
 				{EnterFullScreen ? (
 					<EnterFullScreen>

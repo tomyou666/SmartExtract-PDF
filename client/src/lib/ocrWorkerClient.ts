@@ -166,6 +166,9 @@ export function getOcrQueue(): OcrQueue {
 			onResult,
 			onError: (_task, err) => console.warn('OCR task error', err),
 			executeTask: createExecuteTask(),
+			onStateChange: (state) => {
+				usePdfViewerStore.getState().setOcrProgress(state);
+			},
 		});
 	}
 	return queueInstance;

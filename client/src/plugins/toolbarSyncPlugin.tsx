@@ -109,6 +109,7 @@ export function toolbarSyncPlugin(): Plugin {
 					layoutCache.detections.length > 0 &&
 					layoutCache.imageWidth === imageData.width &&
 					layoutCache.imageHeight === imageData.height;
+				if (!usePdfViewerStore.getState().ocrEnabled) return;
 				const queue = getOcrQueue();
 				queue.setVisiblePage(pdfId, visiblePage);
 				if (useLayoutCache && layoutCache) {

@@ -57,6 +57,10 @@ interface PdfViewerState {
 	lastAutoOrderedRectsByPage: Record<number, SelectionRect[]>;
 	/** OCR 結果。キー `${pdfId}:${pageIndex}` */
 	ocrResults: Record<string, OcrPageResult>;
+	/** OCR 機能の ON/OFF。false のときは enqueue しない */
+	ocrEnabled: boolean;
+	/** OCR キュー進捗（実行中・待機数）。表示用 */
+	ocrProgress: { running: number; pending: number };
 
 	setViewerApi: (api: PdfViewerApi | null) => void;
 	setPdfId: (id: string | null) => void;
@@ -73,6 +77,8 @@ interface PdfViewerState {
 	setHasEmbeddedOutline: (v: boolean | null) => void;
 	setLastAutoOrderedRects: (pageIndex: number, rects: SelectionRect[]) => void;
 	setOcrResult: (key: string, result: OcrPageResult | null) => void;
+	setOcrEnabled: (on: boolean) => void;
+	setOcrProgress: (v: { running: number; pending: number }) => void;
 	reset: () => void;
 }
 
@@ -91,12 +97,14 @@ const initialState = {
 	hasEmbeddedOutline: null as boolean | null,
 	lastAutoOrderedRectsByPage: {} as Record<number, SelectionRect[]>,
 	ocrResults: {} as Record<string, OcrPageResult>,
+	ocrEnabled: true,
+	ocrProgress: { running: 0, pending: 0 },
 };
 
 export const usePdfViewerStore = create<PdfViewerState>((set) => ({
 	...initialState,
 	setViewerApi: (viewerApi) => set({ viewerApi }),
-	setPdfId: (pdfId) => set({ pdfId }),
+	setPdfId: (pdfId) => set({ pdfId, ocrProgress: { running: 0, pending: 0 } }),
 	setPdfDoc: (pdfDoc) => set({ pdfDoc }),
 	setViewerContainerRef: (viewerContainerRef) => set({ viewerContainerRef }),
 	setPageCanvas: (pageIndex, canvas) =>
@@ -143,6 +151,8 @@ export const usePdfViewerStore = create<PdfViewerState>((set) => ({
 			else next[key] = result;
 			return { ocrResults: next };
 		}),
+	setOcrEnabled: (ocrEnabled) => set({ ocrEnabled }),
+	setOcrProgress: (ocrProgress) => set({ ocrProgress }),
 	reset: () =>
 		set({
 			...initialState,
@@ -154,5 +164,6 @@ export const usePdfViewerStore = create<PdfViewerState>((set) => ({
 			hasEmbeddedOutline: null,
 			lastAutoOrderedRectsByPage: {},
 			ocrResults: {},
+			ocrProgress: { running: 0, pending: 0 },
 		}),
 }));
