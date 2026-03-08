@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
 
 interface PageLayout {
@@ -61,8 +61,32 @@ export function OcrTextLayer() {
 		scrollWidth: 0,
 		pageLayouts: new Map(),
 	});
+	/** ref.current の有無で bounds を再計算するため、コンテナ検知時にインクリメント */
+	const [containerReady, setContainerReady] = useState(0);
+	const lastContainerRef = useRef<HTMLDivElement | null>(null);
 
+	// ref.current が後からセットされても bounds をやり直すため、コンテナの有無を検知する
 	useLayoutEffect(() => {
+		const el = viewerContainerRef?.current ?? null;
+		if (el !== lastContainerRef.current) {
+			lastContainerRef.current = el;
+			if (el) setContainerReady((r) => r + 1);
+		}
+		if (!el) {
+			const raf = requestAnimationFrame(() => {
+				const el2 = viewerContainerRef?.current ?? null;
+				if (el2 && el2 !== lastContainerRef.current) {
+					lastContainerRef.current = el2;
+					setContainerReady((r) => r + 1);
+				}
+			});
+			return () => cancelAnimationFrame(raf);
+		}
+	}, [viewerContainerRef]);
+
+	// containerReady を依存に含め、ref.current が後からセットされたときに bounds を再計算する
+	useLayoutEffect(() => {
+		void containerReady; // ref.current 検知時の再実行トリガー
 		const container = viewerContainerRef?.current ?? null;
 		const update = () => setBounds(getBounds(container, pageCanvases));
 		update();
@@ -74,7 +98,7 @@ export function OcrTextLayer() {
 			ro.disconnect();
 			container.removeEventListener('scroll', update);
 		};
-	}, [viewerContainerRef, pageCanvases]);
+	}, [viewerContainerRef, pageCanvases, containerReady]);
 
 	if (!pdfId || Object.keys(ocrResults).length === 0) return null;
 	if (bounds.scrollWidth <= 0) return null;
