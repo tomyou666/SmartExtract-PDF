@@ -41,7 +41,7 @@ const NDL_YAML_URL = '/ndlocr-lite/config/ndl.yaml';
 const NDLMOJI_YAML_URL = '/ndlocr-lite/config/NDLmoji.yaml';
 /** モデルが 800x800 の場合は 800、1024x1024 の場合は 1024。未取得時は 800（DEIMv2 r4_800 系） */
 const DEIM_INPUT_SIZE_DEFAULT = 800;
-const CONF_THRESHOLD = 0.25;
+const CONF_THRESHOLD = 0.1;
 
 let deimSession: ort.InferenceSession | null = null;
 /** DEIM の images 入力の高さ・幅（モデルメタデータから取得、未取得時は DEIM_INPUT_SIZE_DEFAULT） */
