@@ -106,7 +106,7 @@ cd server && uv sync && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 **クライアント**
 
 ```bash
-cd client && bun install && bun run dev
+cd client && proto install && bun install && bun run dev
 ```
 
 - 初回は devcontainer で PostgreSQL が起動し、`schema.sql` が実行されます。
