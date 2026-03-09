@@ -149,7 +149,7 @@ export function createOcrQueue(options: OcrQueueOptions) {
 		const task = queue.shift();
 		if (!task) return;
 		const key = taskKey(task.pdfId, task.pageIndex, task.type);
-		pendingKeys.delete(key);
+		// key は finally で削除。実行中も pendingKeys に残し、同一 key の重複 enqueue を防ぐ
 		running += 1;
 		currentPageIndex = task.pageIndex;
 		notifyState();
@@ -166,6 +166,7 @@ export function createOcrQueue(options: OcrQueueOptions) {
 		} catch (err) {
 			onError?.(task, err);
 		} finally {
+			pendingKeys.delete(key);
 			running -= 1;
 			if (running === 0) currentPageIndex = undefined;
 			notifyState();
