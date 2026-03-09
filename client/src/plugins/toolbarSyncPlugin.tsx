@@ -1,4 +1,4 @@
-import type { Plugin } from '@react-pdf-viewer/core';
+import { LayerRenderStatus, type Plugin } from '@react-pdf-viewer/core';
 import type { RefObject } from 'react';
 import { createElement, Fragment, useEffect } from 'react';
 import { OcrTextLayer } from '@/components/OcrTextLayer';
@@ -60,6 +60,7 @@ export function toolbarSyncPlugin(): Plugin {
 		},
 		onCanvasLayerRender(props) {
 			usePdfViewerStore.getState().setPageCanvas(props.pageIndex, props.ele);
+			if (props.status !== LayerRenderStatus.DidRender) return;
 			(async () => {
 				const {
 					pdfId,
