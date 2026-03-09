@@ -39,9 +39,30 @@ function PagesContainerRefSync({
 export function toolbarSyncPlugin(): Plugin {
 	return {
 		onViewerStateChange(viewerState) {
+			const prev = usePdfViewerStore.getState();
+			const prevScale = prev.scale;
+			const nextScale = viewerState.scale;
+			let nextSelectionRects = prev.selectionRects;
+			if (
+				prev.selectionRects.length > 0 &&
+				prevScale > 0 &&
+				nextScale > 0 &&
+				prevScale !== nextScale
+			) {
+				const factor = nextScale / prevScale;
+				nextSelectionRects = prev.selectionRects.map((r) => ({
+					...r,
+					x: r.x * factor,
+					y: r.y * factor,
+					w: r.w * factor,
+					h: r.h * factor,
+				}));
+			}
+
 			usePdfViewerStore.setState({
 				pageIndex: viewerState.pageIndex,
-				scale: viewerState.scale,
+				scale: nextScale,
+				selectionRects: nextSelectionRects,
 			});
 			return viewerState;
 		},

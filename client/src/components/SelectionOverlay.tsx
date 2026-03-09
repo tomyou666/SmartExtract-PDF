@@ -39,11 +39,15 @@ function getBounds(
 	const pageLayouts = new Map<number, PageLayout>();
 	for (const [pageIndex, canvas] of pageCanvases) {
 		const canvasRect = canvas.getBoundingClientRect();
+		const contentWidth = canvasRect.width;
+		const contentHeight = canvasRect.height;
+
+		if (contentWidth <= 0 || contentHeight <= 0) {
+			continue;
+		}
 		const contentLeft =
 			canvasRect.left - containerRect.left + container.scrollLeft;
 		const contentTop = canvasRect.top - containerRect.top + container.scrollTop;
-		const contentWidth = canvasRect.width;
-		const contentHeight = canvasRect.height;
 		pageLayouts.set(pageIndex, {
 			contentLeft,
 			contentTop,
@@ -111,7 +115,10 @@ export function SelectionOverlay() {
 
 	useLayoutEffect(() => {
 		const container = viewerContainerRef?.current ?? null;
-		const update = () => setBounds(getBounds(container, pageCanvases));
+		const update = () => {
+			const b = getBounds(container, pageCanvases);
+			setBounds(b);
+		};
 		update();
 		if (!container) return;
 		const ro = new ResizeObserver(update);
@@ -183,7 +190,8 @@ export function SelectionOverlay() {
 			if (hitPage == null) return;
 			e.preventDefault();
 			e.stopPropagation();
-			const layout = b.pageLayouts.get(hitPage)!;
+			const layout = b.pageLayouts.get(hitPage);
+			if (!layout) return;
 			const canvasX = (contentX - layout.contentLeft) * layout.scaleX;
 			const canvasY = (contentY - layout.contentTop) * layout.scaleY;
 			setDrawing({
@@ -229,7 +237,7 @@ export function SelectionOverlay() {
 
 				return (
 					<Rnd
-						key={index}
+						key={`${rect.pageIndex}-${rect.x}-${rect.y}-${rect.w}-${rect.h}-${index}`}
 						data-selection-rect
 						className='border-2 border-primary bg-primary/10'
 						style={{ overflow: 'visible', pointerEvents: 'auto', zIndex: 1 }}
@@ -240,7 +248,9 @@ export function SelectionOverlay() {
 						onDragStop={(_e, d) => {
 							const newX = (d.x - layout.contentLeft) * layout.scaleX;
 							const newY = (d.y - layout.contentTop) * layout.scaleY;
-							updateSelectionRect(index, {
+							const targetIndex = selectionRects.indexOf(rect);
+							if (targetIndex === -1) return;
+							updateSelectionRect(targetIndex, {
 								...rect,
 								x: Math.max(0, newX),
 								y: Math.max(0, newY),
@@ -251,7 +261,9 @@ export function SelectionOverlay() {
 							const contentH = ref.offsetHeight;
 							const newX = (position.x - layout.contentLeft) * layout.scaleX;
 							const newY = (position.y - layout.contentTop) * layout.scaleY;
-							updateSelectionRect(index, {
+							const targetIndex = selectionRects.indexOf(rect);
+							if (targetIndex === -1) return;
+							updateSelectionRect(targetIndex, {
 								pageIndex: rect.pageIndex,
 								x: Math.max(0, newX),
 								y: Math.max(0, newY),
