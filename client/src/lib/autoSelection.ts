@@ -7,9 +7,9 @@ import type { SelectionRect } from '@/stores/pdfViewerStore';
 import {
 	getLayoutCache,
 	LAYOUT_CACHE_VERSION,
-	setLayoutCache,
 	type LayoutCacheValue,
 	type LayoutRect,
+	setLayoutCache,
 } from './ocrCache';
 
 function runLayoutFromCacheTask(
@@ -140,7 +140,8 @@ export async function getLayoutForPage(
 		Array.isArray(cached.detections) &&
 		cached.detections.length > 0;
 
-	if (isNewFormat && cached) {
+	// キャッシュがあり、かつ detections が空でない場合はキャッシュから orderedRects を取得
+	if (isNewFormat && cached?.detections?.length) {
 		const orderedRects = await runLayoutFromCacheTask(pdfId, pageIndex, cached);
 		return orderedRects.map((r) => ({
 			pageIndex,

@@ -42,6 +42,8 @@ const NDLMOJI_YAML_URL = '/ndlocr-lite/config/NDLmoji.yaml';
 /** モデルが 800x800 の場合は 800、1024x1024 の場合は 1024。未取得時は 800（DEIMv2 r4_800 系） */
 const DEIM_INPUT_SIZE_DEFAULT = 800;
 const CONF_THRESHOLD = 0.1;
+/** これより小さい幅または高さの imageData は処理しない（空・極小解像度のスキップ用） */
+const MIN_IMAGE_DIMENSION = 10;
 
 let deimSession: ort.InferenceSession | null = null;
 /** DEIM の images 入力の高さ・幅（モデルメタデータから取得、未取得時は DEIM_INPUT_SIZE_DEFAULT） */
@@ -370,6 +372,22 @@ self.onmessage = async (ev: MessageEvent<WorkerTask>) => {
 				lineRanks,
 			);
 			const imageData = payload.imageData;
+			if (
+				!imageData ||
+				!imageData.data ||
+				imageData.data.length === 0 ||
+				imageData.width <= MIN_IMAGE_DIMENSION ||
+				imageData.height <= MIN_IMAGE_DIMENSION
+			) {
+				self.postMessage({
+					type: 'result',
+					pdfId,
+					pageIndex,
+					taskType: type,
+					lines: [],
+				});
+				return;
+			}
 			const lines: Array<{
 				bbox: { x: number; y: number; w: number; h: number };
 				text: string;
@@ -395,6 +413,32 @@ self.onmessage = async (ev: MessageEvent<WorkerTask>) => {
 
 		// layout / layoutAndOcr: DEIM 実行
 		const imageData = payload.imageData;
+		if (
+			!imageData ||
+			!imageData.data ||
+			imageData.data.length === 0 ||
+			imageData.width <= MIN_IMAGE_DIMENSION ||
+			imageData.height <= MIN_IMAGE_DIMENSION
+		) {
+			const { paddedWidth, paddedHeight } = getPaddedSize(
+				imageData?.width ?? 0,
+				imageData?.height ?? 0,
+			);
+			self.postMessage({
+				type: 'result',
+				pdfId,
+				pageIndex,
+				taskType: type,
+				orderedRects: [],
+				...(type === 'layoutAndOcr' ? { lines: [] } : {}),
+				detections: [],
+				imageWidth: imageData?.width ?? 0,
+				imageHeight: imageData?.height ?? 0,
+				paddedWidth,
+				paddedHeight,
+			});
+			return;
+		}
 		const [detections, classNames] = await Promise.all([
 			runDeim(imageData),
 			loadNdlClasses(),
@@ -410,6 +454,7 @@ self.onmessage = async (ev: MessageEvent<WorkerTask>) => {
 			imageData.height,
 		);
 
+		// layout: DEIM 実行 → orderedRects と detections を返す
 		if (type === 'layout') {
 			self.postMessage({
 				type: 'result',
