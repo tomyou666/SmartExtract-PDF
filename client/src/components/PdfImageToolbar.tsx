@@ -1,23 +1,22 @@
+import {
+	Copy,
+	ImagePlus,
+	Sparkles,
+	Square,
+	SquarePlus,
+	Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import {
-	ImagePlus,
-	Square,
-	ListOrdered,
-	Trash2,
-	Copy,
-	SquarePlus,
-	ScanSearch,
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { usePdfViewerStore } from '@/stores/pdfViewerStore';
-import { useChatImageStore } from '@/stores/chatImageStore';
+import { getLayoutForPage } from '@/lib/autoSelection';
 import {
+	copyImageDataUrlToClipboard,
 	getCurrentPageImageDataUrl,
 	getSelectionImageDataUrl,
-	copyImageDataUrlToClipboard,
 } from '@/lib/pdfImage';
-import { getLayoutForPage } from '@/lib/autoSelection';
+import { useChatImageStore } from '@/stores/chatImageStore';
+import { usePdfViewerStore } from '@/stores/pdfViewerStore';
 
 interface PdfImageToolbarProps {
 	pdfId: string | null;
@@ -31,7 +30,6 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 	const setSelectionMode = usePdfViewerStore((s) => s.setSelectionMode);
 	const isDrawingMode = usePdfViewerStore((s) => s.isDrawingMode);
 	const setDrawingMode = usePdfViewerStore((s) => s.setDrawingMode);
-	const addSelectionRect = usePdfViewerStore((s) => s.addSelectionRect);
 	const clearSelectionRects = usePdfViewerStore((s) => s.clearSelectionRects);
 	const replaceSelectionRectsForPage = usePdfViewerStore(
 		(s) => s.replaceSelectionRectsForPage,
@@ -47,31 +45,9 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 		if (url) addImage(url);
 	};
 
-	const addCurrentPageToSelection = () => {
-		const canvas = pageCanvases.get(pageIndex);
-		if (!canvas) return;
-		addSelectionRect({
-			pageIndex,
-			x: 0,
-			y: 0,
-			w: canvas.width,
-			h: canvas.height,
-		});
-	};
-
 	const addSelectionAsImage = () => {
 		const url = getSelectionImageDataUrl(pageCanvases, selectionRects);
 		if (url) addImage(url);
-	};
-
-	const addNewRect = () => {
-		const canvas = pageCanvases.get(pageIndex);
-		if (!canvas) return;
-		const defaultW = Math.min(200, canvas.width * 0.4);
-		const defaultH = Math.min(150, canvas.height * 0.3);
-		const x = Math.max(0, (canvas.width - defaultW) / 2);
-		const y = Math.max(0, (canvas.height - defaultH) / 2);
-		addSelectionRect({ pageIndex, x, y, w: defaultW, h: defaultH });
 	};
 
 	const runAutoSelection = async () => {
@@ -117,16 +93,22 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 				PDFから画像を追加
 			</p>
 			<div className='flex flex-wrap gap-1'>
-				<Button variant='outline' size='sm' onClick={addCurrentPageAsImage}>
-					<ImagePlus className='mr-1 h-3 w-3' />
+				<Button
+					variant='outline'
+					size='sm'
+					onClick={addCurrentPageAsImage}
+					className='min-w-26'
+				>
+					<ImagePlus className='mr-1 h-3 w-3 shrink-0' />
 					現在のページ
 				</Button>
 				<Button
 					variant='outline'
 					size='sm'
 					onClick={() => setSelectionMode(!selectionMode)}
+					className='min-w-22'
 				>
-					<Square className='mr-1 h-3 w-3' />
+					<Square className='mr-1 h-3 w-3 shrink-0' />
 					矩形選択
 				</Button>
 			</div>
@@ -137,34 +119,25 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 							variant={isDrawingMode ? 'default' : 'outline'}
 							size='sm'
 							onClick={() => setDrawingMode(!isDrawingMode)}
+							className='min-w-28'
 						>
-							<SquarePlus className='mr-1 h-3 w-3' />
+							<SquarePlus className='mr-1 h-3 w-3 shrink-0' />
 							矩形を描画
-						</Button>
-						<Button variant='outline' size='sm' onClick={addNewRect}>
-							矩形を追加
-						</Button>
-						<Button
-							variant='outline'
-							size='sm'
-							onClick={addCurrentPageToSelection}
-						>
-							<ListOrdered className='mr-1 h-3 w-3' />
-							現在のページを選択に追加
 						</Button>
 						<Button
 							variant='outline'
 							size='sm'
 							onClick={runAutoSelection}
 							disabled={autoSelecting}
+							className='min-w-44'
 						>
-							<ScanSearch className='mr-1 h-3 w-3' />
-							{autoSelecting ? '検出中…' : '自動矩形選択'}
+							<Sparkles className='mr-1 h-3 w-3 shrink-0' />
+							{autoSelecting ? '検出中…' : 'AIで自動矩形選択'}
 						</Button>
 					</div>
 					{selectionRects.length > 0 && (
 						<>
-							<div className='text-muted-foreground text-xs'>
+							<div className='text-muted-foreground tabular-nums text-xs'>
 								選択: {selectionRects.length} 件（ドラッグ・リサイズ可）
 							</div>
 							<div className='flex flex-wrap gap-1'>
@@ -172,20 +145,23 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 									variant='outline'
 									size='sm'
 									onClick={copySelectionToClipboard}
+									className='min-w-40 active:scale-95 active:opacity-90 transition-transform'
 								>
-									<Copy className='mr-1 h-3 w-3' />
+									<Copy className='mr-1 h-3 w-3 shrink-0' />
 									クリップボードにコピー
 								</Button>
 								<Button
 									variant='outline'
 									size='sm'
 									onClick={addSelectionAsImage}
+									className='min-w-42'
 								>
 									選択範囲を画像に追加
 								</Button>
 								<Button
 									variant='ghost'
 									size='sm'
+									className='min-w-9'
 									onClick={() => {
 										clearSelectionRects();
 										setDrawingMode(false);
