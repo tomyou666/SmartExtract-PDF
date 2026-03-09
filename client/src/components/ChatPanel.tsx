@@ -352,6 +352,7 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 						contentType: 'image/png' as const,
 					}))
 				: undefined;
+		if (text === '' && !attachments) return;
 		setInput('');
 		if (!currentSessionId) {
 			setPendingFirstMessage({ text, attachments });
@@ -370,6 +371,8 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 	};
 
 	const isLoading = status === 'submitted' || status === 'streaming';
+	const canSend =
+		!isLoading && (input.trim().length > 0 || pendingImages.length > 0);
 
 	const handlePaste = useCallback(
 		(e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -616,7 +619,7 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 							className='border-border bg-background text-foreground min-h-0 w-full flex-1 resize-none rounded border px-2 py-1 pt-3 text-sm'
 						/>
 					</div>
-					<Button type='submit' size='icon' disabled={isLoading}>
+					<Button type='submit' size='icon' disabled={!canSend}>
 						<Send className='h-4 w-4' />
 					</Button>
 				</div>
