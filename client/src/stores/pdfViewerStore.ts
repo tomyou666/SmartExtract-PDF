@@ -59,8 +59,13 @@ interface PdfViewerState {
 	ocrResults: Record<string, OcrPageResult>;
 	/** OCR 機能の ON/OFF。false のときは enqueue しない */
 	ocrEnabled: boolean;
-	/** OCR キュー進捗（実行中・待機数）。表示用 */
-	ocrProgress: { running: number; pending: number };
+	/** OCR キュー進捗（実行中・待機数・実行中ページ）。表示用 */
+	ocrProgress: {
+		running: number;
+		pending: number;
+		/** 実行中タスクのページ（0-based）。実行中でないときは undefined */
+		currentPageIndex?: number;
+	};
 
 	setViewerApi: (api: PdfViewerApi | null) => void;
 	setPdfId: (id: string | null) => void;
@@ -78,7 +83,11 @@ interface PdfViewerState {
 	setLastAutoOrderedRects: (pageIndex: number, rects: SelectionRect[]) => void;
 	setOcrResult: (key: string, result: OcrPageResult | null) => void;
 	setOcrEnabled: (on: boolean) => void;
-	setOcrProgress: (v: { running: number; pending: number }) => void;
+	setOcrProgress: (v: {
+		running: number;
+		pending: number;
+		currentPageIndex?: number;
+	}) => void;
 	reset: () => void;
 }
 
@@ -98,13 +107,17 @@ const initialState = {
 	lastAutoOrderedRectsByPage: {} as Record<number, SelectionRect[]>,
 	ocrResults: {} as Record<string, OcrPageResult>,
 	ocrEnabled: true,
-	ocrProgress: { running: 0, pending: 0 },
+	ocrProgress: { running: 0, pending: 0, currentPageIndex: undefined },
 };
 
 export const usePdfViewerStore = create<PdfViewerState>((set) => ({
 	...initialState,
 	setViewerApi: (viewerApi) => set({ viewerApi }),
-	setPdfId: (pdfId) => set({ pdfId, ocrProgress: { running: 0, pending: 0 } }),
+	setPdfId: (pdfId) =>
+		set({
+			pdfId,
+			ocrProgress: { running: 0, pending: 0, currentPageIndex: undefined },
+		}),
 	setPdfDoc: (pdfDoc) => set({ pdfDoc }),
 	setViewerContainerRef: (viewerContainerRef) => set({ viewerContainerRef }),
 	setPageCanvas: (pageIndex, canvas) =>
@@ -164,6 +177,6 @@ export const usePdfViewerStore = create<PdfViewerState>((set) => ({
 			hasEmbeddedOutline: null,
 			lastAutoOrderedRectsByPage: {},
 			ocrResults: {},
-			ocrProgress: { running: 0, pending: 0 },
+			ocrProgress: { running: 0, pending: 0, currentPageIndex: undefined },
 		}),
 }));

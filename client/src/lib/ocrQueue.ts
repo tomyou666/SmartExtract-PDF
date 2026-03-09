@@ -61,8 +61,12 @@ export interface OcrQueueOptions {
 	onResult: (result: OcrTaskResult) => void;
 	onError?: (task: OcrTask, err: unknown) => void;
 	executeTask: TaskHandler;
-	/** 実行中・待機数が変わったときに呼ぶ（UI進捗用） */
-	onStateChange?: (state: { running: number; pending: number }) => void;
+	/** 実行中・待機数が変わったときに呼ぶ（UI進捗用）。currentPageIndex は実行中タスクのページ（0-based）。 */
+	onStateChange?: (state: {
+		running: number;
+		pending: number;
+		currentPageIndex?: number;
+	}) => void;
 }
 
 function taskKey(pdfId: string, pageIndex: number, type: OcrTaskType): string {
@@ -75,10 +79,15 @@ export function createOcrQueue(options: OcrQueueOptions) {
 	const pendingKeys = new Set<string>();
 	let visiblePage: { pdfId: string; pageIndex: number } | null = null;
 	let running = 0;
+	let currentPageIndex: number | undefined = undefined;
 	let idleScheduled = false;
 
 	function notifyState(): void {
-		onStateChange?.({ running, pending: queue.length });
+		onStateChange?.({
+			running,
+			pending: queue.length,
+			currentPageIndex: running > 0 ? currentPageIndex : undefined,
+		});
 	}
 
 	function removeDuplicate(key: string): void {
@@ -142,6 +151,7 @@ export function createOcrQueue(options: OcrQueueOptions) {
 		const key = taskKey(task.pdfId, task.pageIndex, task.type);
 		pendingKeys.delete(key);
 		running += 1;
+		currentPageIndex = task.pageIndex;
 		notifyState();
 		try {
 			const result = await executeTask(task);
@@ -157,6 +167,7 @@ export function createOcrQueue(options: OcrQueueOptions) {
 			onError?.(task, err);
 		} finally {
 			running -= 1;
+			if (running === 0) currentPageIndex = undefined;
 			notifyState();
 			scheduleProcess();
 		}

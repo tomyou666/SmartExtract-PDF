@@ -9,10 +9,10 @@ import {
 	ZoomIn,
 	ZoomOut,
 } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { API_BASE } from '@/lib/utils';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
-import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface BottomBarProps {
 	pdfId: string | null;
@@ -87,12 +87,19 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 				</Button>
 			</div>
 			<div className='flex items-center gap-1'>
-				{ocrProgress.running > 0 && (
-					<span
-						className='flex items-center text-muted-foreground'
-						title={`OCR実行中: ${ocrProgress.running} ページ`}
-					>
-						<Loader2 className='h-4 w-4 animate-spin' aria-hidden />
+				{(ocrProgress.running > 0 || ocrProgress.pending > 0) && (
+					<span className='flex items-center gap-1.5 text-muted-foreground text-sm'>
+						{ocrProgress.running > 0 && (
+							<Loader2 className='h-4 w-4 shrink-0 animate-spin' aria-hidden />
+						)}
+						<span className='min-w-24'>
+							{ocrProgress.running > 0 &&
+								ocrProgress.currentPageIndex !== undefined && (
+									<>OCR実行中: ページ {ocrProgress.currentPageIndex + 1}</>
+								)}
+							{ocrProgress.running > 0 && ocrProgress.pending > 0 && ' / '}
+							{ocrProgress.pending > 0 && <>待機数: {ocrProgress.pending}</>}
+						</span>
 					</span>
 				)}
 				<Button
