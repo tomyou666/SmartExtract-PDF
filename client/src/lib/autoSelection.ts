@@ -157,12 +157,21 @@ export async function getLayoutForPage(
 			cached,
 			existing,
 		);
+		const { imageWidth, imageHeight } = cached;
+		const { width: currentWidth, height: currentHeight } = imageData;
+		const hasSize =
+			typeof imageWidth === 'number' &&
+			typeof imageHeight === 'number' &&
+			imageWidth > 0 &&
+			imageHeight > 0;
+		const scaleX = hasSize ? currentWidth / imageWidth : 1;
+		const scaleY = hasSize ? currentHeight / imageHeight : 1;
 		return orderedRects.map((r) => ({
 			pageIndex,
-			x: r.x,
-			y: r.y,
-			w: r.w,
-			h: r.h,
+			x: r.x * scaleX,
+			y: r.y * scaleY,
+			w: r.w * scaleX,
+			h: r.h * scaleY,
 		}));
 	}
 

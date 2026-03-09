@@ -70,15 +70,48 @@ export function toolbarSyncPlugin(): Plugin {
 				if (!pdfId || !pdfDoc) return;
 				const pageIndex = props.pageIndex;
 				const key = `${pdfId}:${pageIndex}`;
+				const canvas = props.ele as HTMLCanvasElement;
+				const ctx = canvas?.getContext('2d');
+				if (!ctx) return;
+				const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
 				const cached = await getOcrCache(pdfId, pageIndex);
 				if (cached) {
-					if (cached.lines?.length || cached.hasEmbeddedText) {
+					// テキスト埋め込みあり: bbox はなくフラグのみ利用
+					if (cached.hasEmbeddedText) {
 						usePdfViewerStore.getState().setOcrResult(key, {
-							lines: cached.lines ?? [],
-							hasEmbeddedText: cached.hasEmbeddedText,
+							lines: [],
+							hasEmbeddedText: true,
 						});
+						return;
 					}
-					return;
+					// OCR 行キャッシュあり: 保存時画像サイズと現在キャンバスサイズの比率で bbox をスケーリングして利用
+					if (cached.lines?.length) {
+						const { imageWidth, imageHeight } = cached;
+						let linesToUse = cached.lines;
+						if (
+							typeof imageWidth === 'number' &&
+							typeof imageHeight === 'number' &&
+							(imageWidth !== imageData.width ||
+								imageHeight !== imageData.height)
+						) {
+							const scaleX = imageData.width / imageWidth;
+							const scaleY = imageData.height / imageHeight;
+							linesToUse = cached.lines.map((line) => ({
+								...line,
+								bbox: {
+									x: line.bbox.x * scaleX,
+									y: line.bbox.y * scaleY,
+									w: line.bbox.w * scaleX,
+									h: line.bbox.h * scaleY,
+								},
+							}));
+						}
+						usePdfViewerStore.getState().setOcrResult(key, {
+							lines: linesToUse,
+						});
+						return;
+					}
 				}
 				try {
 					const page = await pdfDoc.getPage(pageIndex + 1);
@@ -98,10 +131,6 @@ export function toolbarSyncPlugin(): Plugin {
 					console.error('Error getting text content', error);
 					// proceed to OCR
 				}
-				const canvas = props.ele as HTMLCanvasElement;
-				const ctx = canvas?.getContext('2d');
-				if (!ctx) return;
-				const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 				const layoutCache = await getLayoutCache(pdfId, pageIndex);
 				const useLayoutCache =
 					layoutCache &&

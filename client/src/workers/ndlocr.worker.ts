@@ -311,6 +311,8 @@ self.onmessage = async (ev: MessageEvent<WorkerTask>) => {
 				pageIndex,
 				taskType: type,
 				orderedRects,
+				imageWidth: payload.imageWidth,
+				imageHeight: payload.imageHeight,
 			});
 			return;
 		}
@@ -328,6 +330,8 @@ self.onmessage = async (ev: MessageEvent<WorkerTask>) => {
 					pageIndex,
 					taskType: type,
 					lines: [],
+					imageWidth: payload.imageWidth,
+					imageHeight: payload.imageHeight,
 				});
 				return;
 			}
@@ -377,6 +381,8 @@ self.onmessage = async (ev: MessageEvent<WorkerTask>) => {
 				pageIndex,
 				taskType: type,
 				lines,
+				imageWidth: payload.imageWidth,
+				imageHeight: payload.imageHeight,
 			});
 			return;
 		}

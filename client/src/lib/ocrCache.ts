@@ -34,6 +34,9 @@ export interface OcrLine {
 export interface OcrCacheValue {
 	lines: OcrLine[];
 	hasEmbeddedText?: boolean;
+	/** OCR 実行時のキャンバス幅・高さ（ズーム倍率に対応）。旧フォーマットでは undefined。 */
+	imageWidth?: number;
+	imageHeight?: number;
 }
 
 interface NdlOcrDBSchema extends DBSchema {

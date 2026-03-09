@@ -61,6 +61,8 @@ function createExecuteTask(): (task: OcrTask) => Promise<{
 				orderedRects?: LayoutResult['orderedRects'];
 				lines?: OcrLineResult[];
 				layoutCachePayload?: LayoutCachePayload;
+				imageWidth?: number;
+				imageHeight?: number;
 			}>((resolve, reject) => {
 				const onMessage = (
 					e: MessageEvent<{
@@ -84,14 +86,15 @@ function createExecuteTask(): (task: OcrTask) => Promise<{
 						return;
 					}
 					if (d?.type === 'result') {
-						const layoutCachePayload: LayoutCachePayload | undefined =
-							Array.isArray(d.detections) &&
+						const hasImageSize =
 							typeof d.imageWidth === 'number' &&
-							typeof d.imageHeight === 'number'
+							typeof d.imageHeight === 'number';
+						const layoutCachePayload: LayoutCachePayload | undefined =
+							Array.isArray(d.detections) && hasImageSize
 								? {
 										detections: d.detections,
-										imageWidth: d.imageWidth,
-										imageHeight: d.imageHeight,
+										imageWidth: d.imageWidth as number,
+										imageHeight: d.imageHeight as number,
 										paddedWidth: d.paddedWidth,
 										paddedHeight: d.paddedHeight,
 									}
@@ -100,6 +103,8 @@ function createExecuteTask(): (task: OcrTask) => Promise<{
 							orderedRects: d.orderedRects,
 							lines: d.lines,
 							layoutCachePayload,
+							imageWidth: hasImageSize ? d.imageWidth : undefined,
+							imageHeight: hasImageSize ? d.imageHeight : undefined,
 						});
 						return;
 					}
@@ -142,7 +147,14 @@ function createExecuteTask(): (task: OcrTask) => Promise<{
 }
 
 function onResult(result: OcrTaskResult): void {
-	const { pdfId, pageIndex, lines, layoutCachePayload } = result;
+	const {
+		pdfId,
+		pageIndex,
+		lines,
+		layoutCachePayload,
+		imageWidth,
+		imageHeight,
+	} = result;
 	const key = `${pdfId}:${pageIndex}`;
 	if (layoutCachePayload) {
 		setLayoutCache(pdfId, pageIndex, {
@@ -155,7 +167,12 @@ function onResult(result: OcrTaskResult): void {
 		}).catch(() => {});
 	}
 	if (lines) {
-		setOcrCache(pdfId, pageIndex, { lines }).catch(() => {});
+		const cacheValue: Parameters<typeof setOcrCache>[2] = { lines };
+		if (typeof imageWidth === 'number' && typeof imageHeight === 'number') {
+			cacheValue.imageWidth = imageWidth;
+			cacheValue.imageHeight = imageHeight;
+		}
+		setOcrCache(pdfId, pageIndex, cacheValue).catch(() => {});
 		usePdfViewerStore.getState().setOcrResult(key, { lines });
 	}
 }

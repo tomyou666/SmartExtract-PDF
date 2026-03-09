@@ -45,6 +45,9 @@ export interface OcrTaskResult {
 	lines?: OcrLineResult[];
 	/** layoutAndOcr 時に layout キャッシュ保存用 */
 	layoutCachePayload?: LayoutCachePayload;
+	/** OCR 実行時のキャンバス幅・高さ（テキスト座標系）。 */
+	imageWidth?: number;
+	imageHeight?: number;
 }
 
 /** Worker が単一のため、同時実行は 1 本に制限。 */
@@ -55,6 +58,8 @@ type TaskHandler = (task: OcrTask) => Promise<{
 	orderedRects?: LayoutResult['orderedRects'];
 	lines?: OcrLineResult[];
 	layoutCachePayload?: LayoutCachePayload;
+	imageWidth?: number;
+	imageHeight?: number;
 }>;
 
 export interface OcrQueueOptions {
@@ -162,6 +167,8 @@ export function createOcrQueue(options: OcrQueueOptions) {
 				orderedRects: result.orderedRects,
 				lines: result.lines,
 				layoutCachePayload: result.layoutCachePayload,
+				imageWidth: result.imageWidth,
+				imageHeight: result.imageHeight,
 			});
 		} catch (err) {
 			onError?.(task, err);
