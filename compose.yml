@@ -1,0 +1,38 @@
+services:
+  pdf-viewer:
+    container_name: "pdf-viewer-server"
+    build:
+      context: ./.devcontainer
+      dockerfile: Dockerfile
+    depends_on:
+      - pdf-viewer-db
+    volumes:
+      - .:/workspace:cached
+    ports:
+      - "5173:5173"
+      - "8000:8000"
+    command: ["sh", "-lc", "sh /workspace/dev.sh"]
+
+  pdf-viewer-db:
+    container_name: pdf-viewer-db
+    build:
+      context: ./.devcontainer/db
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_DB: pdf-viewer-postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./.devcontainer/db/sql:/docker-entrypoint-initdb.d
+      - pdf-viewer-db-data:/var/lib/postgresql/data
+    networks:
+      - default
+    restart: "no"
+
+volumes:
+  pdf-viewer-db-data:
+  
+networks:
+  default:

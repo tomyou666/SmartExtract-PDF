@@ -16,6 +16,10 @@ RUN apt-get update && apt-get install -y \
 
 RUN apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
+ENV PROTO_HOME="/root/.proto"
+ENV PATH="/root/.local/bin:${PROTO_HOME}/shims:${PATH}"
+ENV UV_LINK_MODE=copy
+
 RUN echo 'source "$HOME/.local/bin/env"' >> ~/.bashrc
 RUN echo "export UV_LINK_MODE=copy" >> ~/.bashrc
 RUN echo '# proto \n\
