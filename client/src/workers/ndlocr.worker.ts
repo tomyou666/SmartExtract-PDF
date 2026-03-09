@@ -264,10 +264,15 @@ function buildOrderedRectsFromDetections(
 	classNames: string[],
 	imageWidth: number,
 	imageHeight: number,
+	existingRects?: BlockRect[],
 ): Array<{ x: number; y: number; w: number; h: number }> {
 	const rawBlockRects = buildBlockRectsFromDetections(detections, classNames);
-	if (rawBlockRects.length === 0) return [];
-	const blockRects = mergeOverlappingBlockRects(rawBlockRects);
+	const allRects =
+		existingRects?.length !== undefined && existingRects.length > 0
+			? [...rawBlockRects, ...existingRects]
+			: rawBlockRects;
+	if (allRects.length === 0) return [];
+	const blockRects = mergeOverlappingBlockRects(allRects);
 	const bboxes: BBox[] = blockRects.map((r) => [
 		r.x,
 		r.y,
@@ -290,6 +295,7 @@ type WorkerTask =
 			pdfId: string;
 			pageIndex: number;
 			imageData: ImageData;
+			existingRects?: Array<{ x: number; y: number; w: number; h: number }>;
 	  }
 	| {
 			type: 'layoutFromCache';
@@ -300,6 +306,7 @@ type WorkerTask =
 			imageHeight: number;
 			paddedWidth?: number;
 			paddedHeight?: number;
+			existingRects?: Array<{ x: number; y: number; w: number; h: number }>;
 	  }
 	| {
 			type: 'ocrFromLayoutCache';
@@ -334,6 +341,7 @@ self.onmessage = async (ev: MessageEvent<WorkerTask>) => {
 				classNames,
 				payload.imageWidth,
 				payload.imageHeight,
+				payload.existingRects,
 			);
 			self.postMessage({
 				type: 'result',
@@ -452,6 +460,7 @@ self.onmessage = async (ev: MessageEvent<WorkerTask>) => {
 			classNames,
 			imageData.width,
 			imageData.height,
+			payload.existingRects,
 		);
 
 		// layout: DEIM 実行 → orderedRects と detections を返す

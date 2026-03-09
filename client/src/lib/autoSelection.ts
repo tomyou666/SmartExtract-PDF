@@ -16,6 +16,7 @@ function runLayoutFromCacheTask(
 	pdfId: string,
 	pageIndex: number,
 	cached: LayoutCacheValue,
+	existingRects?: Array<{ x: number; y: number; w: number; h: number }>,
 ): Promise<LayoutRect[]> {
 	return new Promise((resolve, reject) => {
 		const worker = new Worker(
@@ -53,6 +54,7 @@ function runLayoutFromCacheTask(
 			imageHeight: cached.imageHeight,
 			paddedWidth: cached.paddedWidth,
 			paddedHeight: cached.paddedHeight,
+			...(existingRects?.length ? { existingRects } : {}),
 		});
 	});
 }
@@ -61,6 +63,7 @@ function runLayoutTask(
 	pdfId: string,
 	pageIndex: number,
 	imageData: ImageData,
+	existingRects?: Array<{ x: number; y: number; w: number; h: number }>,
 ): Promise<{
 	orderedRects: LayoutRect[];
 	detections: LayoutCacheValue['detections'];
@@ -119,6 +122,7 @@ function runLayoutTask(
 			pdfId,
 			pageIndex,
 			imageData,
+			...(existingRects?.length ? { existingRects } : {}),
 		});
 	});
 }
@@ -126,12 +130,17 @@ function runLayoutTask(
 /**
  * 指定ページのブロック矩形（読み順付き）を返す。
  * キャッシュに detections があれば Worker で都度 orderedRects を計算し、なければ Worker で layout を実行してキャッシュに保存する。
+ * existingRects を渡すと DEIM 結果とマージして mergeOverlappingBlockRects でマージし、XY-cut でソートした結果を返す。
  */
 export async function getLayoutForPage(
 	pdfId: string,
 	pageIndex: number,
 	imageData: ImageData,
+	existingRects?: SelectionRect[],
 ): Promise<SelectionRect[]> {
+	const existing =
+		existingRects?.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })) ??
+		undefined;
 	const cached = await getLayoutCache(pdfId, pageIndex);
 	const isNewFormat =
 		cached &&
@@ -142,7 +151,12 @@ export async function getLayoutForPage(
 
 	// キャッシュがあり、かつ detections が空でない場合はキャッシュから orderedRects を取得
 	if (isNewFormat && cached?.detections?.length) {
-		const orderedRects = await runLayoutFromCacheTask(pdfId, pageIndex, cached);
+		const orderedRects = await runLayoutFromCacheTask(
+			pdfId,
+			pageIndex,
+			cached,
+			existing,
+		);
 		return orderedRects.map((r) => ({
 			pageIndex,
 			x: r.x,
@@ -152,7 +166,7 @@ export async function getLayoutForPage(
 		}));
 	}
 
-	const result = await runLayoutTask(pdfId, pageIndex, imageData);
+	const result = await runLayoutTask(pdfId, pageIndex, imageData, existing);
 	await setLayoutCache(pdfId, pageIndex, {
 		version: LAYOUT_CACHE_VERSION,
 		detections: result.detections,

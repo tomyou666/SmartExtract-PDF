@@ -32,8 +32,8 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 	const setDrawingMode = usePdfViewerStore((s) => s.setDrawingMode);
 	const addSelectionRect = usePdfViewerStore((s) => s.addSelectionRect);
 	const clearSelectionRects = usePdfViewerStore((s) => s.clearSelectionRects);
-	const lastAutoOrderedRectsByPage = usePdfViewerStore(
-		(s) => s.lastAutoOrderedRectsByPage,
+	const replaceSelectionRectsForPage = usePdfViewerStore(
+		(s) => s.replaceSelectionRectsForPage,
 	);
 	const setLastAutoOrderedRects = usePdfViewerStore(
 		(s) => s.setLastAutoOrderedRects,
@@ -75,23 +75,24 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 	};
 
 	const runAutoSelection = async () => {
-		const cached = lastAutoOrderedRectsByPage[pageIndex];
-		if (cached?.length) {
-			clearSelectionRects();
-			for (const r of cached) addSelectionRect(r);
-			return;
-		}
 		const canvas = pageCanvases.get(pageIndex);
 		if (!canvas || !pdfId) return;
+		const existingOnPage = selectionRects.filter(
+			(r) => r.pageIndex === pageIndex,
+		);
 		setAutoSelecting(true);
 		try {
 			const ctx = canvas.getContext('2d');
 			if (!ctx) return;
 			const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-			const rects = await getLayoutForPage(pdfId, pageIndex, imageData);
+			const rects = await getLayoutForPage(
+				pdfId,
+				pageIndex,
+				imageData,
+				existingOnPage,
+			);
 			setLastAutoOrderedRects(pageIndex, rects);
-			clearSelectionRects();
-			for (const r of rects) addSelectionRect(r);
+			replaceSelectionRectsForPage(pageIndex, rects);
 		} finally {
 			setAutoSelecting(false);
 		}

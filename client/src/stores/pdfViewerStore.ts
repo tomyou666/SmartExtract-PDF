@@ -77,6 +77,10 @@ interface PdfViewerState {
 	removeSelectionRect: (index: number) => void;
 	reorderSelectionRects: (fromIndex: number, toIndex: number) => void;
 	clearSelectionRects: () => void;
+	replaceSelectionRectsForPage: (
+		pageIndex: number,
+		rects: SelectionRect[],
+	) => void;
 	setSelectionMode: (on: boolean) => void;
 	setDrawingMode: (on: boolean) => void;
 	setHasEmbeddedOutline: (v: boolean | null) => void;
@@ -147,6 +151,13 @@ export const usePdfViewerStore = create<PdfViewerState>((set) => ({
 			return { selectionRects: arr };
 		}),
 	clearSelectionRects: () => set({ selectionRects: [] }),
+	replaceSelectionRectsForPage: (pageIndex, rects) =>
+		set((s) => ({
+			selectionRects: [
+				...s.selectionRects.filter((r) => r.pageIndex !== pageIndex),
+				...rects.map((r) => ({ ...r, pageIndex })),
+			],
+		})),
 	setSelectionMode: (selectionMode) => set({ selectionMode }),
 	setDrawingMode: (isDrawingMode) => set({ isDrawingMode }),
 	setHasEmbeddedOutline: (hasEmbeddedOutline) => set({ hasEmbeddedOutline }),
