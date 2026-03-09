@@ -124,10 +124,24 @@ export function OcrTextLayer() {
 						<div key={pageIndex}>
 							{result.lines.map((line, lineIndex) => {
 								const { bbox, text } = line;
+								// bbox が不正な場合は描画しない（座標なしで左上に固まる不具合を防ぐ）
+								const hasValidBbox =
+									bbox &&
+									Number.isFinite(bbox.x) &&
+									Number.isFinite(bbox.y) &&
+									Number.isFinite(bbox.w) &&
+									Number.isFinite(bbox.h);
+								if (!hasValidBbox) return null;
 								const overlayX = layout.contentLeft + bbox.x / layout.scaleX;
 								const overlayY = layout.contentTop + bbox.y / layout.scaleY;
 								const overlayW = bbox.w / layout.scaleX;
 								const overlayH = bbox.h / layout.scaleY;
+								const hasValidCoords =
+									Number.isFinite(overlayX) &&
+									Number.isFinite(overlayY) &&
+									Number.isFinite(overlayW) &&
+									Number.isFinite(overlayH);
+								if (!hasValidCoords) return null;
 								const lineKey = `${pageIndex}-${lineIndex}-${bbox.x}-${bbox.y}`;
 								return (
 									<span
