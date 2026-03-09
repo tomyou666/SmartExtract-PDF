@@ -54,6 +54,7 @@ export function OcrTextLayer() {
 	const viewerContainerRef = usePdfViewerStore((s) => s.viewerContainerRef);
 	const pageCanvases = usePdfViewerStore((s) => s.pageCanvases);
 	const pdfId = usePdfViewerStore((s) => s.pdfId);
+	const ocrEnabled = usePdfViewerStore((s) => s.ocrEnabled);
 	const ocrResults = usePdfViewerStore((s) => s.ocrResults);
 
 	const [bounds, setBounds] = useState<Bounds>({
@@ -100,7 +101,8 @@ export function OcrTextLayer() {
 		};
 	}, [viewerContainerRef, pageCanvases, containerReady]);
 
-	if (!pdfId || Object.keys(ocrResults).length === 0) return null;
+	if (!ocrEnabled || !pdfId || Object.keys(ocrResults).length === 0)
+		return null;
 	if (bounds.scrollWidth <= 0) return null;
 
 	const { scrollHeight, scrollWidth, pageLayouts } = bounds;
