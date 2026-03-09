@@ -1,7 +1,7 @@
+import { X } from 'lucide-react';
 import { useLayoutEffect, useState } from 'react';
 import { Rnd } from 'react-rnd';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
-import { X } from 'lucide-react';
 
 interface PageLayout {
 	contentLeft: number;
@@ -121,7 +121,7 @@ export function SelectionOverlay() {
 			ro.disconnect();
 			container.removeEventListener('scroll', update);
 		};
-	}, [viewerContainerRef, pageCanvases, selectionRects.length]);
+	}, [viewerContainerRef, pageCanvases]);
 
 	useLayoutEffect(() => {
 		if (!drawing) return;
@@ -131,9 +131,9 @@ export function SelectionOverlay() {
 			if (!container) return;
 			const b = getBounds(container, pageCanvases);
 			const layout = b.pageLayouts.get(drawing.pageIndex);
-			if (!layout) return;
-			const contentX = e.clientX - b.containerRect!.left + container.scrollLeft;
-			const contentY = e.clientY - b.containerRect!.top + container.scrollTop;
+			if (!layout || !b.containerRect) return;
+			const contentX = e.clientX - b.containerRect.left + container.scrollLeft;
+			const contentY = e.clientY - b.containerRect.top + container.scrollTop;
 			const canvasX = (contentX - layout.contentLeft) * layout.scaleX;
 			const canvasY = (contentY - layout.contentTop) * layout.scaleY;
 			setDrawing((d) =>
