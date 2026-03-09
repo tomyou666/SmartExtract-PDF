@@ -22,6 +22,7 @@ import {
 	sortBboxesByRank,
 	solve as xyCutSolve,
 } from '../lib/readingOrder';
+import { type Rect, mergeOverlappingBlockRects } from '../lib/rectUtils';
 
 // CPU (WASM): 全コアだと重くなるため「論理コアの半分、最低1・最大4」に制限。
 // ※マルチスレッドには crossOriginIsolated が必要（SharedArrayBuffer）。
@@ -220,51 +221,12 @@ function clipRectToImage(
 	return { x, y, w, h };
 }
 
-type BlockRect = { x: number; y: number; w: number; h: number };
-
-function rectsOverlap(a: BlockRect, b: BlockRect): boolean {
-	const ax2 = a.x + a.w;
-	const ay2 = a.y + a.h;
-	const bx2 = b.x + b.w;
-	const by2 = b.y + b.h;
-	const interX0 = Math.max(a.x, b.x);
-	const interY0 = Math.max(a.y, b.y);
-	const interX1 = Math.min(ax2, bx2);
-	const interY1 = Math.min(ay2, by2);
-	return interX1 > interX0 && interY1 > interY0;
-}
-
-function mergeOverlappingBlockRects(rects: BlockRect[]): BlockRect[] {
-	if (rects.length <= 1) return rects;
-	const source = [...rects];
-	const merged: BlockRect[] = [];
-	while (source.length > 0) {
-		let current = source.pop() as BlockRect;
-		for (let i = 0; i < source.length; ) {
-			if (rectsOverlap(current, source[i])) {
-				const other = source[i];
-				const x1 = Math.min(current.x, other.x);
-				const y1 = Math.min(current.y, other.y);
-				const x2 = Math.max(current.x + current.w, other.x + other.w);
-				const y2 = Math.max(current.y + current.h, other.y + other.h);
-				current = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
-				source.splice(i, 1);
-				i = 0;
-			} else {
-				i++;
-			}
-		}
-		merged.push(current);
-	}
-	return merged;
-}
-
 function buildOrderedRectsFromDetections(
 	detections: DEIMDetection[],
 	classNames: string[],
 	imageWidth: number,
 	imageHeight: number,
-	existingRects?: BlockRect[],
+	existingRects?: Rect[],
 ): Array<{ x: number; y: number; w: number; h: number }> {
 	const rawBlockRects = buildBlockRectsFromDetections(detections, classNames);
 	const allRects =

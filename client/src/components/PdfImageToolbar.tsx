@@ -1,6 +1,8 @@
 import {
 	Copy,
 	ImagePlus,
+	Minus,
+	Plus,
 	Sparkles,
 	Square,
 	SquarePlus,
@@ -15,8 +17,11 @@ import {
 	getCurrentPageImageDataUrl,
 	getSelectionImageDataUrl,
 } from '@/lib/pdfImage';
+import { expandShrinkRects } from '@/lib/rectUtils';
 import { useChatImageStore } from '@/stores/chatImageStore';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
+
+const EXPAND_SHRINK_STEP_PX = 10;
 
 interface PdfImageToolbarProps {
 	pdfId: string | null;
@@ -85,6 +90,53 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 		}
 	};
 
+	const currentPageRects = selectionRects.filter(
+		(r) => r.pageIndex === pageIndex,
+	);
+	const hasRectsOnCurrentPage = currentPageRects.length > 0;
+
+	const expandSelectionRects = () => {
+		const canvas = pageCanvases.get(pageIndex);
+		if (!canvas || !hasRectsOnCurrentPage) return;
+		const rects = currentPageRects.map((r) => ({
+			x: r.x,
+			y: r.y,
+			w: r.w,
+			h: r.h,
+		}));
+		const next = expandShrinkRects(
+			rects,
+			EXPAND_SHRINK_STEP_PX,
+			canvas.width,
+			canvas.height,
+		);
+		replaceSelectionRectsForPage(
+			pageIndex,
+			next.map((r) => ({ pageIndex, ...r })),
+		);
+	};
+
+	const shrinkSelectionRects = () => {
+		const canvas = pageCanvases.get(pageIndex);
+		if (!canvas || !hasRectsOnCurrentPage) return;
+		const rects = currentPageRects.map((r) => ({
+			x: r.x,
+			y: r.y,
+			w: r.w,
+			h: r.h,
+		}));
+		const next = expandShrinkRects(
+			rects,
+			-EXPAND_SHRINK_STEP_PX,
+			canvas.width,
+			canvas.height,
+		);
+		replaceSelectionRectsForPage(
+			pageIndex,
+			next.map((r) => ({ pageIndex, ...r })),
+		);
+	};
+
 	if (!pdfId) return null;
 
 	return (
@@ -141,6 +193,30 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 								選択: {selectionRects.length} 件（ドラッグ・リサイズ可）
 							</div>
 							<div className='flex flex-wrap gap-1'>
+								<Button
+									variant='outline'
+									size='sm'
+									onClick={expandSelectionRects}
+									disabled={!hasRectsOnCurrentPage}
+									className='min-w-20'
+									title='選択範囲を拡張（現在ページ）'
+									aria-label='選択範囲を拡張'
+								>
+									<Plus className='mr-0.5 h-3 w-3 shrink-0' />
+									拡張
+								</Button>
+								<Button
+									variant='outline'
+									size='sm'
+									onClick={shrinkSelectionRects}
+									disabled={!hasRectsOnCurrentPage}
+									className='min-w-20'
+									title='選択範囲を収縮（現在ページ）'
+									aria-label='選択範囲を収縮'
+								>
+									<Minus className='mr-0.5 h-3 w-3 shrink-0' />
+									収縮
+								</Button>
 								<Button
 									variant='outline'
 									size='sm'

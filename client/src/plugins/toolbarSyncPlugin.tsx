@@ -81,7 +81,7 @@ export function toolbarSyncPlugin(): Plugin {
 					return;
 				}
 				try {
-					const page = await pdfDoc.getPage(pageIndex);
+					const page = await pdfDoc.getPage(pageIndex + 1);
 					const content = await page.getTextContent();
 					if (content.items.length > 0) {
 						await setOcrCache(pdfId, pageIndex, {
@@ -94,7 +94,8 @@ export function toolbarSyncPlugin(): Plugin {
 						});
 						return;
 					}
-				} catch {
+				} catch (error) {
+					console.error('Error getting text content', error);
 					// proceed to OCR
 				}
 				const canvas = props.ele as HTMLCanvasElement;
