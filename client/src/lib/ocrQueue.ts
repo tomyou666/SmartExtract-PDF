@@ -47,7 +47,8 @@ export interface OcrTaskResult {
 	layoutCachePayload?: LayoutCachePayload;
 }
 
-const MAX_CONCURRENT = 3;
+/** Worker が単一のため、同時実行は 1 本に制限。 */
+const MAX_CONCURRENT = 1;
 const IDLE_DEADLINE_MS = 2;
 
 type TaskHandler = (task: OcrTask) => Promise<{
