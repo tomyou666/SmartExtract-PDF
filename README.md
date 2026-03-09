@@ -86,6 +86,15 @@ devcontainer で開くと Python + Node + PostgreSQL が立ち上がります。
 - **Python**: uv 利用（`.python-version` で 3.13）
 - **Node**: proto + bun（クライアントは `client/.prototools` で bun）
 
+### 環境変数の設定
+
+サーバー・クライアントともに、`.env.example` をコピーして `.env` を作成してください。
+
+```bash
+cp server/.env.example server/.env
+cp client/.env.example client/.env
+```
+
 ### 起動
 
 **サーバー**
@@ -108,8 +117,8 @@ cd client && bun install && bun run dev
 
 - 本リポジトリで新規に作成したコード一式のライセンスは **MIT** です。
 - ただし、PDF ビューアの **レイアウト認識（DEIM）・文字認識（PARSeq）・読み順整序** 機能の一部実装は、  
-  国立国会図書館 NDL ラボが CC BY 4.0 ライセンスで公開している **「NDLOCR-Liteアプリケーションのリポジトリ」**  
- （`https://github.com/ndl-lab/ndlocr-lite`）を参考にしており、同ライセンスに基づくクレジット表記を行います。
+   国立国会図書館 NDL ラボが CC BY 4.0 ライセンスで公開している **「NDLOCR-Liteアプリケーションのリポジトリ」**  
+  （`https://github.com/ndl-lab/ndlocr-lite`）を参考にしており、同ライセンスに基づくクレジット表記を行います。
   - 原著作物: 国立国会図書館 NDL ラボ「NDLOCR-Liteアプリケーションのリポジトリ」
   - ライセンス: Creative Commons Attribution 4.0 International (CC BY 4.0)  
     `https://creativecommons.org/licenses/by/4.0/deed.ja`  
