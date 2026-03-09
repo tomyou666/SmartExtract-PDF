@@ -11,7 +11,7 @@ services:
     ports:
       - "5173:5173"
       - "8000:8000"
-    command: ["sh", "-lc", "sh /workspace/dev.sh"]
+    command: ["sh", "-c", "sh /workspace/dev.sh"]
 
   pdf-viewer-db:
     container_name: pdf-viewer-db
