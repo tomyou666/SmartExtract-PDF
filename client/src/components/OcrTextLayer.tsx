@@ -144,19 +144,26 @@ export function OcrTextLayer() {
 									Number.isFinite(overlayW) &&
 									Number.isFinite(overlayH);
 								if (!hasValidCoords) return null;
+								const isVertical = overlayW < overlayH;
+								const baseFontSize = isVertical ? overlayW : overlayH;
+								const fontSize = Math.max(8, baseFontSize * 0.8);
 								const lineKey = `${pageIndex}-${lineIndex}-${bbox.x}-${bbox.y}`;
 								return (
 									<span
 										key={lineKey}
-										className='absolute pointer-events-auto cursor-text whitespace-pre text-foreground/70 selection:bg-primary/30 selection:text-foreground'
+										className='absolute pointer-events-auto cursor-text whitespace-pre [text-align-last:justify] text-transparent selection:bg-primary/30 selection:text-transparent'
 										style={{
 											left: overlayX,
 											top: overlayY,
 											width: overlayW,
 											height: overlayH,
-											fontSize: `${Math.max(8, overlayH * 0.8)}px`,
+											fontSize: `${fontSize}px`,
 											lineHeight: 1,
 											overflow: 'hidden',
+											...(isVertical && {
+												writingMode: 'vertical-rl',
+												textOrientation: 'mixed',
+											}),
 										}}
 									>
 										{text}
