@@ -1,42 +1,12 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/inter";
+
+@custom-variant dark (&:is(.dark *));
 
 @source "../node_modules/streamdown/dist/*.js";
-
-@theme {
-	/* GitHub light を意識した明るいテーマ */
-	--color-background: #ffffff;
-	--color-foreground: #24292f;
-	--color-muted: #f6f8fa;
-	--color-muted-foreground: #57606a;
-	--color-border: #d0d7de;
-	--color-accent: #f6f8fa;
-	--color-accent-foreground: #24292f;
-	--color-primary: #0969da;
-	--color-primary-foreground: #ffffff;
-	--color-destructive: #cf222e;
-	--color-destructive-foreground: #ffffff;
-	--color-secondary: #f6f8fa;
-	--color-secondary-foreground: #24292f;
-	--color-ring: #0969da;
-}
-
-:root[data-theme="dark"] {
-	/* GitHub dark を意識したダークテーマ */
-	--color-background: #0d1117;
-	--color-foreground: #c9d1d9;
-	--color-muted: #151b23;
-	--color-muted-foreground: #8b949e;
-	--color-border: #30363d;
-	--color-accent: #151b23;
-	--color-accent-foreground: #e6edf3;
-	--color-primary: #1f6feb;
-	--color-primary-foreground: #f0f6fc;
-	--color-destructive: #f85149;
-	--color-destructive-foreground: #f0f6fc;
-	--color-secondary: #151b23;
-	--color-secondary-foreground: #e6edf3;
-	--color-ring: #1f6feb;
-}
 
 /* スクロールバーのスタイル（Firefox） */
 * {
@@ -58,4 +28,131 @@
 	background-color: var(--color-border);
 	border-radius: 9999px;
 	border: 2px solid var(--color-muted);
+}
+
+/* GitHub (Primer) 風ライトテーマ */
+:root {
+	--background: oklch(1 0 0);
+	--foreground: oklch(0.22 0.012 265);
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.22 0.012 265);
+	--popover: oklch(1 0 0);
+	--popover-foreground: oklch(0.22 0.012 265);
+	--primary: oklch(0.488 0.2 264);
+	--primary-foreground: oklch(1 0 0);
+	--secondary: oklch(0.975 0.003 264);
+	--secondary-foreground: oklch(0.22 0.012 265);
+	--muted: oklch(0.975 0.003 264);
+	--muted-foreground: oklch(0.52 0.015 265);
+	--accent: oklch(0.94 0.01 255);
+	--accent-foreground: oklch(0.22 0.012 265);
+	--destructive: oklch(0.55 0.22 27);
+	--border: oklch(0.87 0.008 255);
+	--input: oklch(0.87 0.008 255);
+	--ring: oklch(0.488 0.2 264);
+	--chart-1: oklch(0.488 0.2 264);
+	--chart-2: oklch(0.55 0.18 155);
+	--chart-3: oklch(0.65 0.15 255);
+	--chart-4: oklch(0.65 0.12 85);
+	--chart-5: oklch(0.55 0.18 25);
+	--radius: 0.375rem;
+	--sidebar: oklch(0.975 0.003 264);
+	--sidebar-foreground: oklch(0.22 0.012 265);
+	--sidebar-primary: oklch(0.488 0.2 264);
+	--sidebar-primary-foreground: oklch(1 0 0);
+	--sidebar-accent: oklch(0.94 0.01 255);
+	--sidebar-accent-foreground: oklch(0.22 0.012 265);
+	--sidebar-border: oklch(0.87 0.008 255);
+	--sidebar-ring: oklch(0.488 0.2 264);
+}
+
+/* GitHub (Primer) 風ダークテーマ */
+.dark {
+	--background: oklch(0.13 0.015 265);
+	--foreground: oklch(0.93 0.01 255);
+	--card: oklch(0.16 0.015 265);
+	--card-foreground: oklch(0.93 0.01 255);
+	--popover: oklch(0.16 0.015 265);
+	--popover-foreground: oklch(0.93 0.01 255);
+	--primary: oklch(0.65 0.15 255);
+	--primary-foreground: oklch(0.13 0.015 265);
+	--secondary: oklch(0.22 0.012 265);
+	--secondary-foreground: oklch(0.93 0.01 255);
+	--muted: oklch(0.22 0.012 265);
+	--muted-foreground: oklch(0.65 0.01 265);
+	--accent: oklch(0.28 0.012 265);
+	--accent-foreground: oklch(0.93 0.01 255);
+	--destructive: oklch(0.6 0.2 25);
+	--border: oklch(0.28 0.012 265);
+	--input: oklch(0.28 0.012 265);
+	--ring: oklch(0.65 0.15 255);
+	--chart-1: oklch(0.65 0.15 255);
+	--chart-2: oklch(0.6 0.16 155);
+	--chart-3: oklch(0.7 0.12 255);
+	--chart-4: oklch(0.7 0.1 85);
+	--chart-5: oklch(0.6 0.18 25);
+	--sidebar: oklch(0.16 0.015 265);
+	--sidebar-foreground: oklch(0.93 0.01 255);
+	--sidebar-primary: oklch(0.65 0.15 255);
+	--sidebar-primary-foreground: oklch(0.13 0.015 265);
+	--sidebar-accent: oklch(0.22 0.012 265);
+	--sidebar-accent-foreground: oklch(0.93 0.01 255);
+	--sidebar-border: oklch(0.28 0.012 265);
+	--sidebar-ring: oklch(0.65 0.15 255);
+}
+
+@theme inline {
+	--font-sans:
+		-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica,
+		Arial, sans-serif;
+	--color-sidebar-ring: var(--sidebar-ring);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar: var(--sidebar);
+	--color-chart-5: var(--chart-5);
+	--color-chart-4: var(--chart-4);
+	--color-chart-3: var(--chart-3);
+	--color-chart-2: var(--chart-2);
+	--color-chart-1: var(--chart-1);
+	--color-ring: var(--ring);
+	--color-input: var(--input);
+	--color-border: var(--border);
+	--color-destructive: var(--destructive);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-accent: var(--accent);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-muted: var(--muted);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-secondary: var(--secondary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-primary: var(--primary);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-popover: var(--popover);
+	--color-card-foreground: var(--card-foreground);
+	--color-card: var(--card);
+	--color-foreground: var(--foreground);
+	--color-background: var(--background);
+	--radius-sm: calc(var(--radius) * 0.6);
+	--radius-md: calc(var(--radius) * 0.8);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) * 1.4);
+	--radius-2xl: calc(var(--radius) * 1.8);
+	--radius-3xl: calc(var(--radius) * 2.2);
+	--radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
+	html {
+		@apply font-sans;
+	}
 }

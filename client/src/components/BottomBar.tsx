@@ -53,7 +53,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 				>
 					<ZoomOut className='h-4 w-4' />
 				</Button>
-				<span className='min-w-[4rem] text-center text-sm'>
+				<span className='min-w-16 text-center text-sm'>
 					{Math.round(scale * 100)}%
 				</span>
 				<Button
@@ -74,7 +74,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 				>
 					<ChevronLeft className='h-4 w-4' />
 				</Button>
-				<span className='min-w-[5rem] text-center text-sm'>
+				<span className='min-w-20 text-center text-sm'>
 					{currentPage} / {pageCount || '-'}
 				</span>
 				<Button

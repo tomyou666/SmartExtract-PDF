@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import {
 	ImagePlus,
 	Square,
@@ -58,7 +59,6 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 		});
 	};
 
-	const [copying, setCopying] = useState(false);
 	const addSelectionAsImage = () => {
 		const url = getSelectionImageDataUrl(pageCanvases, selectionRects);
 		if (url) addImage(url);
@@ -101,11 +101,11 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 	const copySelectionToClipboard = async () => {
 		const url = getSelectionImageDataUrl(pageCanvases, selectionRects);
 		if (!url) return;
-		setCopying(true);
 		try {
 			await copyImageDataUrlToClipboard(url);
-		} finally {
-			setCopying(false);
+			toast.success('クリップボードにコピーしました');
+		} catch {
+			toast.error('コピーに失敗しました');
 		}
 	};
 
@@ -172,10 +172,9 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 									variant='outline'
 									size='sm'
 									onClick={copySelectionToClipboard}
-									disabled={copying}
 								>
 									<Copy className='mr-1 h-3 w-3' />
-									{copying ? 'コピー中…' : 'クリップボードにコピー'}
+									クリップボードにコピー
 								</Button>
 								<Button
 									variant='outline'
