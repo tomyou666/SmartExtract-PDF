@@ -141,3 +141,12 @@ export async function deleteAllForPdf(pdfId: string): Promise<void> {
 	await layoutTx.done;
 	await ocrTx.done;
 }
+
+/**
+ * ndlocr-pdf-cache 全体（layout / ocr 両方）の内容をクリアする。
+ * DB 自体は残し、全オブジェクトストアを空にする。
+ */
+export async function clearOcrCacheDatabase(): Promise<void> {
+	const db = await getDB();
+	await Promise.all([db.clear(LAYOUT_STORE), db.clear(OCR_STORE)]);
+}

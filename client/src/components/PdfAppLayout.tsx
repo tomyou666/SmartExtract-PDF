@@ -7,7 +7,7 @@ import { PdfSidebarContext } from '@/contexts/PdfSidebarContext';
 import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar, RightSidebarHeader } from './RightSidebar';
 import { BottomBar } from './BottomBar';
-import { LLMSettingsSheet } from './LLMSettingsSheet';
+import { SettingsSheet } from './SettingsSheet';
 
 type LeftTabId = 'list' | 'thumbnails' | 'bookmarks';
 
@@ -201,7 +201,7 @@ export function PdfAppLayout({
 						</div>
 					)}
 				</aside>
-				<LLMSettingsSheet
+				<SettingsSheet
 					open={settingsOpen}
 					onClose={() => setSettingsOpen(false)}
 				/>
