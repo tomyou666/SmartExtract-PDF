@@ -92,10 +92,15 @@ async def put_llm_settings(
     body: LLMSettingsIn,
     db: AsyncSession = Depends(get_db),
 ) -> LLMSettingsOut:
-    if body.api_key is not None:
+    exists = await db.execute(
+        text("SELECT 1 FROM llm_settings WHERE id = 1")
+    )
+    if exists.mappings().one_or_none() is None:
+        # id=1 が存在しない場合は INSERT
         await db.execute(
             text(
-                "UPDATE llm_settings SET provider = :provider, api_key_encrypted = :api_key, model = :model, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
+                "INSERT INTO llm_settings (id, provider, api_key_encrypted, model, updated_at) "
+                "VALUES (1, :provider, :api_key, :model, CURRENT_TIMESTAMP)"
             ),
             {
                 "provider": body.provider,
@@ -104,12 +109,25 @@ async def put_llm_settings(
             },
         )
     else:
-        await db.execute(
-            text(
-                "UPDATE llm_settings SET provider = :provider, model = :model, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
-            ),
-            {"provider": body.provider, "model": body.model},
-        )
+        # id=1 が存在する場合は UPDATE
+        if body.api_key is not None:
+            await db.execute(
+                text(
+                    "UPDATE llm_settings SET provider = :provider, api_key_encrypted = :api_key, model = :model, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
+                ),
+                {
+                    "provider": body.provider,
+                    "api_key": body.api_key,
+                    "model": body.model,
+                },
+            )
+        else:
+            await db.execute(
+                text(
+                    "UPDATE llm_settings SET provider = :provider, model = :model, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
+                ),
+                {"provider": body.provider, "model": body.model},
+            )
     await db.commit()
     result = await db.execute(
         text("SELECT provider, api_key_encrypted, model FROM llm_settings WHERE id = 1")
