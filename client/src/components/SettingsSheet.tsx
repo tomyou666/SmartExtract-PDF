@@ -190,8 +190,8 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
 							OCR キャッシュ
 						</h4>
 						<p className='mb-2 text-xs text-muted-foreground'>
-							ブラウザに保存されている OCR 結果とレイアウトのキャッシュ
-							（IndexedDB: ndlocr-pdf-cache）をすべて削除します。
+							ブラウザに保存されている OCR
+							結果とレイアウトのキャッシュをすべて削除します。
 						</p>
 						<AlertDialog>
 							<AlertDialogTrigger asChild>
@@ -214,8 +214,9 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
 										OCR キャッシュを削除しますか？
 									</AlertDialogTitle>
 									<AlertDialogDescription>
-										ブラウザに保存されている OCR／レイアウトキャッシュ
-										（ndlocr-pdf-cache）をすべて削除します。
+										ブラウザに保存されている
+										OCR／レイアウトキャッシュをすべて削除します。
+										<br />
 										この操作は取り消せません。本当に実行してよろしいですか？
 									</AlertDialogDescription>
 								</AlertDialogHeader>
