@@ -92,9 +92,7 @@ async def put_llm_settings(
     body: LLMSettingsIn,
     db: AsyncSession = Depends(get_db),
 ) -> LLMSettingsOut:
-    exists = await db.execute(
-        text("SELECT 1 FROM llm_settings WHERE id = 1")
-    )
+    exists = await db.execute(text("SELECT 1 FROM llm_settings WHERE id = 1"))
     if exists.mappings().one_or_none() is None:
         # id=1 が存在しない場合は INSERT
         await db.execute(
