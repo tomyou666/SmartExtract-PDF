@@ -2,7 +2,8 @@
 
 SmartExtract PDF： **PDFのレイアウトを解析、AIへ質問できるOCR×AI対話リーダー** です。
 
-![動作イメージ](mockup/1.mp4)
+[![紹介動画](https://github.com/user-attachments/assets/16304c32-260e-446f-9334-4ba6091fd207)](https://youtu.be/nQbm6lIkAOg?si=GgydRUHQ9GQlkqO3)
+
 
 ## 背景
 
