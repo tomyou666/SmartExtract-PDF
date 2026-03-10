@@ -73,45 +73,28 @@ LLM 設定画面のスクリーンショット
 
 ## 構成
 
-- **クライアント**: Vite (Rolldown) + React 19 + TypeScript, Tailwind v4, shadcn/ui, Vercel AI SDK, Streamdown, Zustand, wouter
-- **サーバー**: FastAPI, SQLAlchemy, LiteLLM, PostgreSQL
+- **クライアント**: Vite (Rolldown) + React 19 + TypeScript, Proto, Tailwind v4, shadcn/ui, Vercel AI SDK, Streamdown, Zustand, wouter
+- **サーバー**: Python3.13, uv, FastAPI, SQLAlchemy, LiteLLM, PostgreSQL
 - **DB**: PostgreSQL
 
-## 開発
+## 起動
 
-### 必要な環境
+起動は **Docker** を使います。[Docker Desktop](https://www.docker.com/products/docker-desktop/) などをインストールしてください。
 
-devcontainer で開くと Python + Node + PostgreSQL が立ち上がります。
+1. **環境変数**: `.env.example` を `.env` にコピーして設定してください。
 
-- **Python**: uv 利用（`.python-version` で 3.13）
-- **Node**: proto + bun（クライアントは `client/.prototools` で bun）
+   ```bash
+   cp server/.env.example server/.env
+   cp client/.env.example client/.env
+   ```
 
-### 環境変数の設定
+2. **Docker Compose で起動**
 
-サーバー・クライアントともに、`.env.example` をコピーして `.env` を作成してください。
+   ```bash
+   docker compose up
+   ```
 
-```bash
-cp server/.env.example server/.env
-cp client/.env.example client/.env
-```
-
-### 起動
-
-**サーバー**
-
-```bash
-cd server && uv sync && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-**クライアント**
-
-```bash
-cd client && proto install && bun install && bun run dev
-```
-
-- 初回は devcontainer で PostgreSQL が起動し、`schema.sql` が実行されます。
-- `/api` は Vite プロキシで `http://localhost:8000` に飛びます。別オリジンにする場合は `VITE_API_URL` を設定。
-- DB 接続先は `DATABASE_URL` で変更できます（devcontainer 内は `pdf-viewer-db:5432`）。
+   アプリは [http://127.0.0.1:5173](http://127.0.0.1:5173)（クライアント）、API は `http://127.0.0.1:8000` で利用できます。
 
 ## ライセンス
 
