@@ -15,6 +15,7 @@ export function ThemeToggle() {
 			size='icon'
 			onClick={toggleTheme}
 			aria-label={isDark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
+			title={isDark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
 		>
 			{isDark ? <Sun className='h-4 w-4' /> : <Moon className='h-4 w-4' />}
 		</Button>

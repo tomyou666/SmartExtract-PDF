@@ -97,6 +97,7 @@ export function LeftSidebar({ onPdfSelect, onPdfDelete }: LeftSidebarProps) {
 									'min-w-0 flex-1 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent',
 								)}
 								onClick={() => onPdfSelect(pdf.id)}
+								title={pdf.filename}
 							>
 								<span className='truncate'>{pdf.filename}</span>
 							</button>

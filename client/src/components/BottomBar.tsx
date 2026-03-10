@@ -50,6 +50,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 					size='icon'
 					onClick={onZoomOut}
 					disabled={!pdfId || !api}
+					title='縮小'
 				>
 					<ZoomOut className='h-4 w-4' />
 				</Button>
@@ -61,6 +62,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 					size='icon'
 					onClick={onZoomIn}
 					disabled={!pdfId || !api}
+					title='拡大'
 				>
 					<ZoomIn className='h-4 w-4' />
 				</Button>
@@ -71,6 +73,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 					size='icon'
 					onClick={onPagePrev}
 					disabled={!pdfId || !api || currentPage <= 1}
+					title='前のページ'
 				>
 					<ChevronLeft className='h-4 w-4' />
 				</Button>
@@ -82,6 +85,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 					size='icon'
 					onClick={onPageNext}
 					disabled={!pdfId || !api || currentPage >= pageCount}
+					title='次のページ'
 				>
 					<ChevronRight className='h-4 w-4' />
 				</Button>
@@ -120,13 +124,14 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 								size='icon'
 								onClick={props.onClick}
 								disabled={!pdfId}
+								title='全画面表示'
 							>
 								<Maximize className='h-4 w-4' />
 							</Button>
 						)}
 					</EnterFullScreen>
 				) : (
-					<Button variant='ghost' size='icon' disabled>
+					<Button variant='ghost' size='icon' disabled title='全画面表示'>
 						<Maximize className='h-4 w-4' />
 					</Button>
 				)}
@@ -135,6 +140,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 					size='icon'
 					onClick={onDownload}
 					disabled={!pdfId}
+					title='ダウンロード'
 				>
 					<Download className='h-4 w-4' />
 				</Button>
