@@ -1,12 +1,12 @@
+import { FileText, Menu, MessageSquare, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { FileText, Menu, MessageSquare, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { PdfSidebarContext } from '@/contexts/PdfSidebarContext';
+import { cn } from '@/lib/utils';
+import { BottomBar } from './BottomBar';
 import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar, RightSidebarHeader } from './RightSidebar';
-import { BottomBar } from './BottomBar';
 import { SettingsSheet } from './SettingsSheet';
 
 type LeftTabId = 'list' | 'thumbnails' | 'bookmarks';
@@ -214,7 +214,10 @@ export function PdfAppLayout({
 
 				{/* Right sidebar resize handle */}
 				{rightOpen && (
+					// biome-ignore lint/a11y/useFocusableInteractive: <explanation>
+					// biome-ignore lint/a11y/useSemanticElements: <explanation>
 					<div
+						// biome-ignore lint/a11y/useAriaPropsForRole: <explanation>
 						role='separator'
 						aria-orientation='vertical'
 						aria-label='右サイドバーの幅を変更'
