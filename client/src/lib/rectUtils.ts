@@ -21,11 +21,13 @@ export function mergeOverlappingBlockRects(rects: Rect[]): Rect[] {
 	if (rects.length <= 1) return rects;
 	const source = [...rects];
 	const merged: Rect[] = [];
+
 	while (source.length > 0) {
-		let current = source.pop() as Rect;
+		let current = source.shift() as Rect;
+
 		for (let i = 0; i < source.length; ) {
-			if (rectsOverlap(current, source[i])) {
-				const other = source[i];
+			const other = source[i];
+			if (rectsOverlap(current, other)) {
 				const x1 = Math.min(current.x, other.x);
 				const y1 = Math.min(current.y, other.y);
 				const x2 = Math.max(current.x + current.w, other.x + other.w);
@@ -37,6 +39,7 @@ export function mergeOverlappingBlockRects(rects: Rect[]): Rect[] {
 				i++;
 			}
 		}
+
 		merged.push(current);
 	}
 	return merged;
