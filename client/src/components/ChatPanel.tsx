@@ -7,9 +7,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
 import 'katex/dist/katex.min.css';
-import { Copy, Pencil, PlusCircle, Send, Trash2, X } from 'lucide-react';
+import {
+	Copy,
+	Loader2,
+	Pencil,
+	PlusCircle,
+	Send,
+	Trash2,
+	X,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { API_BASE } from '@/lib/utils';
+import { useApiKeyStore } from '@/stores/apiKeyStore';
 import { useChatImageStore } from '@/stores/chatImageStore';
 import { useChatSessionStore } from '@/stores/chatSessionStore';
 
@@ -31,6 +40,8 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 	const [loadingSessions, setLoadingSessions] = useState(true);
+	const apiKeyConfigured = useApiKeyStore((s) => s.apiKeyConfigured);
+	const setApiKeyConfigured = useApiKeyStore((s) => s.setApiKeyConfigured);
 	const [pendingFirstMessage, setPendingFirstMessage] = useState<{
 		text: string;
 		attachments?: { url: string; contentType: string }[];
@@ -105,6 +116,15 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 	useEffect(() => {
 		fetchSessions();
 	}, [fetchSessions]);
+
+	useEffect(() => {
+		fetch(`${API_BASE}/api/settings/llm`)
+			.then((r) => (r.ok ? r.json() : Promise.reject(r)))
+			.then((data: { api_key_masked?: boolean }) =>
+				setApiKeyConfigured(Boolean(data.api_key_masked)),
+			)
+			.catch(() => setApiKeyConfigured(false));
+	}, [setApiKeyConfigured]);
 
 	useEffect(() => {
 		if (currentSessionId) {
@@ -372,7 +392,13 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 
 	const isLoading = status === 'submitted' || status === 'streaming';
 	const canSend =
-		!isLoading && (input.trim().length > 0 || pendingImages.length > 0);
+		apiKeyConfigured !== false &&
+		!isLoading &&
+		(input.trim().length > 0 || pendingImages.length > 0);
+	const showThinkingPlaceholder =
+		status === 'submitted' &&
+		messages.length > 0 &&
+		messages[messages.length - 1]?.role === 'user';
 
 	const handlePaste = useCallback(
 		(e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -558,10 +584,35 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 						})}
 					</div>
 				))}
+				{showThinkingPlaceholder && (
+					<div
+						key='thinking-placeholder'
+						className='mb-3 rounded-lg bg-muted/50 mr-4 p-2'
+					>
+						<div className='flex items-center justify-between gap-1'>
+							<span className='text-muted-foreground text-xs font-medium'>
+								アシスタント
+							</span>
+						</div>
+						<div className='flex items-center gap-2 pt-1'>
+							<Loader2
+								className='h-4 w-4 shrink-0 animate-spin text-muted-foreground'
+								aria-hidden
+							/>
+							<span className='text-muted-foreground text-sm'>考え中...</span>
+						</div>
+					</div>
+				)}
 			</div>
 
 			{error && (
 				<p className='text-destructive px-2 text-sm'>{error.message}</p>
+			)}
+
+			{apiKeyConfigured === false && (
+				<p className='text-muted-foreground border-border border-t px-2 py-1.5 text-sm'>
+					APIキーが未設定です。設定からAPIキーを設定してください。
+				</p>
 			)}
 
 			<form
@@ -602,6 +653,10 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 							onMouseDown={handleResizeMouseDown}
 							title='ドラッグで高さを変更'
 							style={{ cursor: 'ns-resize' }}
+							// biome-ignore lint/a11y/useAriaPropsForRole: <explanation>
+							role='slider'
+							aria-label='高さを変更'
+							tabIndex={0}
 						>
 							<span className='rounded-full bg-muted-foreground/30 h-1 w-10 group-hover:bg-muted-foreground/60' />
 						</div>
@@ -610,7 +665,7 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 							onChange={(e) => setInput(e.target.value)}
 							onPaste={handlePaste}
 							onKeyDown={(e) => {
-								if (e.key === 'Enter' && !e.shiftKey) {
+								if (e.key === 'Enter' && !e.shiftKey && canSend) {
 									e.preventDefault();
 									formRef.current?.requestSubmit();
 								}
@@ -620,7 +675,11 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 						/>
 					</div>
 					<Button type='submit' size='icon' disabled={!canSend}>
-						<Send className='h-4 w-4' />
+						{isLoading ? (
+							<Loader2 className='h-4 w-4 animate-spin' aria-label='送信中' />
+						) : (
+							<Send className='h-4 w-4' />
+						)}
 					</Button>
 				</div>
 			</form>

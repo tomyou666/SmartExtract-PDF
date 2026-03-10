@@ -155,7 +155,7 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 					現在のページ
 				</Button>
 				<Button
-					variant='outline'
+					variant={selectionMode ? 'default' : 'outline'}
 					size='sm'
 					onClick={() => setSelectionMode(!selectionMode)}
 					className='min-w-22'

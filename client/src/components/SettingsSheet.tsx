@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { clearOcrCacheDatabase } from '@/lib/ocrCache';
 import { API_BASE } from '@/lib/utils';
+import { useApiKeyStore } from '@/stores/apiKeyStore';
 
 interface ProviderOption {
 	value: string;
@@ -26,6 +27,7 @@ interface SettingsSheetProps {
 }
 
 export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
+	const setApiKeyConfigured = useApiKeyStore((s) => s.setApiKeyConfigured);
 	const [providers, setProviders] = useState<ProviderOption[]>([]);
 	const [models, setModels] = useState<string[]>([]);
 	const [provider, setProvider] = useState('');
@@ -104,6 +106,10 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
 		if (res.ok) {
 			setSaved(true);
 			setTimeout(() => setSaved(false), 2000);
+			if (body.api_key !== undefined) {
+				setApiKeyConfigured(true);
+			}
+			onClose();
 		}
 	};
 
