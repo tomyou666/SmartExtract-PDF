@@ -521,15 +521,8 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 							const assistantText = textFromParts;
 							const userText = textFromParts;
 							const isFirstInTurn = msg.id === turn.messages[0].id;
-							return (
-								<div
-									key={msg.id}
-									className={`mb-3 rounded-lg p-2 relative ${
-										msg.role === 'user'
-											? 'bg-primary/10 ml-4'
-											: 'bg-muted/50 mr-4'
-									}`}
-								>
+							const content = (
+								<>
 									<div className='flex items-center justify-between gap-1'>
 										<span className='text-muted-foreground text-xs font-medium'>
 											{msg.role === 'user' ? 'あなた' : 'アシスタント'}
@@ -579,6 +572,26 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 									) : msg.role === 'user' ? (
 										<p className='whitespace-pre-wrap text-sm'>{userText}</p>
 									) : null}
+								</>
+							);
+							if (msg.role === 'user') {
+								return (
+									<div
+										key={msg.id}
+										className='sticky top-0 z-20 bg-background/95 pt-1'
+									>
+										<div className='mb-3 ml-4 rounded-lg bg-primary/10 p-2 shadow-sm'>
+											{content}
+										</div>
+									</div>
+								);
+							}
+							return (
+								<div
+									key={msg.id}
+									className='mb-3 mr-4 rounded-lg bg-muted/50 p-2 relative'
+								>
+									{content}
 								</div>
 							);
 						})}
