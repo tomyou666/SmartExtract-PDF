@@ -17,7 +17,12 @@ import {
 	X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from '@/components/ui/accordion';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -29,6 +34,7 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { API_BASE } from '@/lib/utils';
 import { useApiKeyStore } from '@/stores/apiKeyStore';
 import { useChatImageStore } from '@/stores/chatImageStore';
@@ -80,10 +86,10 @@ const MessageTurnRow = memo(function MessageTurnRow({
 					<>
 						<div className='flex items-center justify-between gap-1'>
 							<span className='text-muted-foreground text-xs font-medium'>
-								{msg.role === 'user' ? 'あなた' : 'アシスタント'}
+								{msg.role === 'assistant' ? 'アシスタント' : null}
 							</span>
 							<div className='flex items-center gap-0'>
-								{isFirstInTurn && (
+								{msg.role === 'assistant' && isFirstInTurn && (
 									<AlertDialog>
 										<AlertDialogTrigger asChild>
 											<Button
@@ -91,6 +97,7 @@ const MessageTurnRow = memo(function MessageTurnRow({
 												size='icon'
 												className='h-6 w-6 text-muted-foreground hover:text-destructive'
 												aria-label='この会話を削除'
+												title='この会話を削除'
 											>
 												<Trash2 className='h-3 w-3' />
 											</Button>
@@ -116,25 +123,28 @@ const MessageTurnRow = memo(function MessageTurnRow({
 										</AlertDialogContent>
 									</AlertDialog>
 								)}
-								<Button
-									variant='ghost'
-									size='icon'
-									className='h-6 w-6'
-									onClick={() => {
-										const text =
-											msg.parts
-												?.map((p: { type: string; text?: string }) =>
-													p.type === 'text' ? p.text : '',
-												)
-												.filter(Boolean)
-												.join('') ??
-											msg.content ??
-											'';
-										if (text) copyMessage(text);
-									}}
-								>
-									<Copy className='h-3 w-3' />
-								</Button>
+								{msg.role === 'assistant' && (
+									<Button
+										variant='ghost'
+										size='icon'
+										className='h-6 w-6'
+										title='この回答をコピー'
+										onClick={() => {
+											const text =
+												msg.parts
+													?.map((p: { type: string; text?: string }) =>
+														p.type === 'text' ? p.text : '',
+													)
+													.filter(Boolean)
+													.join('') ??
+												msg.content ??
+												'';
+											if (text) copyMessage(text);
+										}}
+									>
+										<Copy className='h-3 w-3' />
+									</Button>
+								)}
 							</div>
 						</div>
 						{msg.role === 'assistant' ? (
@@ -155,19 +165,92 @@ const MessageTurnRow = memo(function MessageTurnRow({
 					return (
 						<div
 							key={msg.id}
-							className='sticky top-0 z-20 bg-background/95 pt-1'
+							className='sticky -top-2 -mt-2 z-20 bg-background/95 pt-1'
 						>
-							<div className='mb-3 ml-4 relative rounded-lg bg-primary/10 p-2 shadow-sm'>
-								<button
-									type='button'
-									aria-label='このターンの位置に移動'
-									className='absolute inset-0 z-0 rounded-lg'
-									onClick={onScrollToTurnTop}
-								/>
-								<div className='relative z-10 pointer-events-none [&_button]:pointer-events-auto'>
-									{content}
-								</div>
-							</div>
+							<Accordion
+								type='single'
+								collapsible
+								className='mb-3 ml-4 rounded-lg bg-primary/10 p-2 shadow-sm'
+								defaultValue={turn.id}
+							>
+								<AccordionItem value={turn.id}>
+									<AccordionTrigger className='px-0 py-0 border-0 hover:no-underline w-full'>
+										<div className='w-full flex flex-col items-stretch gap-0'>
+											<div className='flex items-start justify-between gap-1 w-full'>
+												<div className='text-left min-w-0 flex-1'>
+													<span className='text-muted-foreground text-xs font-medium block mb-1'>
+														あなた
+													</span>
+												</div>
+												<div className='flex items-center gap-0 pl-1'>
+													{isFirstInTurn && (
+														<AlertDialog>
+															<AlertDialogTrigger asChild>
+																<Button
+																	variant='ghost'
+																	size='icon'
+																	className='h-6 w-6 text-muted-foreground hover:text-destructive'
+																	aria-label='この会話を削除'
+																	title='この会話を削除'
+																>
+																	<Trash2 className='h-3 w-3' />
+																</Button>
+															</AlertDialogTrigger>
+															<AlertDialogContent size='sm'>
+																<AlertDialogHeader>
+																	<AlertDialogTitle>
+																		この会話を削除しますか？
+																	</AlertDialogTitle>
+																	<AlertDialogDescription>
+																		この1件の会話（ユーザーとアシスタントのペア）が削除されます。この操作は取り消せません。
+																	</AlertDialogDescription>
+																</AlertDialogHeader>
+																<AlertDialogFooter>
+																	<AlertDialogCancel>
+																		キャンセル
+																	</AlertDialogCancel>
+																	<AlertDialogAction
+																		variant='destructive'
+																		onClick={() =>
+																			deleteConversationTurn(turn.id)
+																		}
+																	>
+																		削除する
+																	</AlertDialogAction>
+																</AlertDialogFooter>
+															</AlertDialogContent>
+														</AlertDialog>
+													)}
+													<Button
+														variant='ghost'
+														size='icon'
+														className='h-6 w-6'
+														title='このメッセージをコピー'
+														onClick={(e) => {
+															e.preventDefault();
+															e.stopPropagation();
+															if (userText) copyMessage(userText);
+														}}
+													>
+														<Copy className='h-3 w-3' />
+													</Button>
+												</div>
+											</div>
+											<p className='line-clamp-2 text-sm whitespace-pre-wrap group-aria-expanded/accordion-trigger:hidden mt-0.5 text-left'>
+												{userText}
+											</p>
+										</div>
+									</AccordionTrigger>
+									<AccordionContent
+										onClick={onScrollToTurnTop}
+										className='pt-0'
+									>
+										<div className='relative z-10 pointer-events-none [&_button]:pointer-events-auto'>
+											{content}
+										</div>
+									</AccordionContent>
+								</AccordionItem>
+							</Accordion>
 						</div>
 					);
 				}
@@ -608,7 +691,12 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 		<div className='flex h-full flex-col'>
 			<div className='flex items-center justify-between gap-2 border-b border-border px-2 py-1'>
 				<span className='text-muted-foreground text-xs'>セッション</span>
-				<Button variant='ghost' size='sm' onClick={createSession}>
+				<Button
+					variant='ghost'
+					size='sm'
+					onClick={createSession}
+					title='新しいセッションを作成'
+				>
 					<PlusCircle className='h-4 w-4' />
 					新規
 				</Button>
@@ -665,6 +753,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 											size='icon'
 											className='h-7 w-7 shrink-0'
 											aria-label='タイトルを編集'
+											title='タイトルを編集'
 											onClick={() => setEditingTitle(true)}
 										>
 											<Pencil className='h-3.5 w-3.5' />
@@ -676,6 +765,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 													size='icon'
 													className='h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive'
 													aria-label='セッションを削除'
+													title='このセッションを削除'
 												>
 													<Trash2 className='h-3.5 w-3.5' />
 												</Button>
@@ -783,6 +873,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 									size='icon'
 									className='absolute -right-1 -top-1 h-5 w-5 rounded-full border border-border shadow'
 									aria-label='画像を削除'
+									title='この画像を削除'
 									onClick={() => removeImage(i)}
 								>
 									<X className='h-3 w-3' />
@@ -822,7 +913,13 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 							className='border-border bg-background text-foreground min-h-0 w-full flex-1 resize-none rounded border px-2 py-1 pt-3 text-sm'
 						/>
 					</div>
-					<Button type='submit' size='icon' disabled={!canSend}>
+					<Button
+						type='submit'
+						size='icon'
+						disabled={!canSend}
+						title={isLoading ? '送信中...' : 'メッセージを送信'}
+						aria-label='メッセージを送信'
+					>
 						{isLoading ? (
 							<Loader2 className='h-4 w-4 animate-spin' aria-label='送信中' />
 						) : (
