@@ -18,12 +18,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-	Accordion,
-	AccordionContent,
-	AccordionItem,
-	AccordionTrigger,
-} from '@/components/ui/accordion';
-import {
 	AlertDialog,
 	AlertDialogAction,
 	AlertDialogCancel,
@@ -35,6 +29,12 @@ import {
 	AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import {
+	ChatAccordion,
+	ChatAccordionContent,
+	ChatAccordionItem,
+	ChatAccordionTrigger,
+} from '@/components/ui/chatAccordion';
 import { API_BASE } from '@/lib/utils';
 import { useApiKeyStore } from '@/stores/apiKeyStore';
 import { useChatImageStore } from '@/stores/chatImageStore';
@@ -167,90 +167,94 @@ const MessageTurnRow = memo(function MessageTurnRow({
 							key={msg.id}
 							className='sticky -top-2 -mt-2 z-20 bg-background/95 pt-1'
 						>
-							<Accordion
+							<ChatAccordion
 								type='single'
 								collapsible
 								className='mb-3 ml-4 rounded-lg bg-primary/10 p-2 shadow-sm'
-								defaultValue={turn.id}
 							>
-								<AccordionItem value={turn.id}>
-									<AccordionTrigger className='px-0 py-0 border-0 hover:no-underline w-full'>
-										<div className='w-full flex flex-col items-stretch gap-0'>
-											<div className='flex items-start justify-between gap-1 w-full'>
-												<div className='text-left min-w-0 flex-1'>
-													<span className='text-muted-foreground text-xs font-medium block mb-1'>
-														あなた
-													</span>
-												</div>
-												<div className='flex items-center gap-0 pl-1'>
-													{isFirstInTurn && (
-														<AlertDialog>
-															<AlertDialogTrigger asChild>
-																<Button
-																	variant='ghost'
-																	size='icon'
-																	className='h-6 w-6 text-muted-foreground hover:text-destructive'
-																	aria-label='この会話を削除'
-																	title='この会話を削除'
-																>
-																	<Trash2 className='h-3 w-3' />
-																</Button>
-															</AlertDialogTrigger>
-															<AlertDialogContent size='sm'>
-																<AlertDialogHeader>
-																	<AlertDialogTitle>
-																		この会話を削除しますか？
-																	</AlertDialogTitle>
-																	<AlertDialogDescription>
-																		この1件の会話（ユーザーとアシスタントのペア）が削除されます。この操作は取り消せません。
-																	</AlertDialogDescription>
-																</AlertDialogHeader>
-																<AlertDialogFooter>
-																	<AlertDialogCancel>
-																		キャンセル
-																	</AlertDialogCancel>
-																	<AlertDialogAction
-																		variant='destructive'
-																		onClick={() =>
-																			deleteConversationTurn(turn.id)
-																		}
-																	>
-																		削除する
-																	</AlertDialogAction>
-																</AlertDialogFooter>
-															</AlertDialogContent>
-														</AlertDialog>
-													)}
-													<Button
-														variant='ghost'
-														size='icon'
-														className='h-6 w-6'
-														title='このメッセージをコピー'
-														onClick={(e) => {
-															e.preventDefault();
-															e.stopPropagation();
-															if (userText) copyMessage(userText);
-														}}
-													>
-														<Copy className='h-3 w-3' />
-													</Button>
-												</div>
-											</div>
-											<p className='line-clamp-2 text-sm whitespace-pre-wrap group-aria-expanded/accordion-trigger:hidden mt-0.5 text-left'>
+								<ChatAccordionItem value={turn.id}>
+									<ChatAccordionTrigger
+										header={
+											<span className='text-muted-foreground text-xs font-medium block mb-1'>
+												あなた
+											</span>
+										}
+										summary={
+											<button
+												type='button'
+												className='line-clamp-2 text-left text-sm whitespace-pre-wrap overflow-hidden mt-0.5'
+												onClick={onScrollToTurnTop}
+											>
 												{userText}
-											</p>
-										</div>
-									</AccordionTrigger>
-									<AccordionContent
+											</button>
+										}
+										className='px-0 py-0 border-0 hover:no-underline w-full'
+										aside={
+											<div className='flex items-center gap-0 pl-1'>
+												{isFirstInTurn && (
+													<AlertDialog>
+														<AlertDialogTrigger asChild>
+															<Button
+																variant='ghost'
+																size='icon'
+																className='h-6 w-6 text-muted-foreground hover:text-destructive'
+																aria-label='この会話を削除'
+																title='この会話を削除'
+															>
+																<Trash2 className='h-3 w-3' />
+															</Button>
+														</AlertDialogTrigger>
+														<AlertDialogContent size='sm'>
+															<AlertDialogHeader>
+																<AlertDialogTitle>
+																	この会話を削除しますか？
+																</AlertDialogTitle>
+																<AlertDialogDescription>
+																	この1件の会話（ユーザーとアシスタントのペア）が削除されます。この操作は取り消せません。
+																</AlertDialogDescription>
+															</AlertDialogHeader>
+															<AlertDialogFooter>
+																<AlertDialogCancel>
+																	キャンセル
+																</AlertDialogCancel>
+																<AlertDialogAction
+																	variant='destructive'
+																	onClick={() =>
+																		deleteConversationTurn(turn.id)
+																	}
+																>
+																	削除する
+																</AlertDialogAction>
+															</AlertDialogFooter>
+														</AlertDialogContent>
+													</AlertDialog>
+												)}
+												<Button
+													variant='ghost'
+													size='icon'
+													className='h-6 w-6'
+													title='このメッセージをコピー'
+													onClick={(e) => {
+														e.preventDefault();
+														e.stopPropagation();
+														if (userText) copyMessage(userText);
+													}}
+												>
+													<Copy className='h-3 w-3' />
+												</Button>
+											</div>
+										}
+									/>
+									<ChatAccordionContent
 										onClick={onScrollToTurnTop}
 										className='pt-0'
 									>
 										<div className='relative z-10 pointer-events-none [&_button]:pointer-events-auto'>
 											{content}
 										</div>
-									</AccordionContent>
-								</AccordionItem>
-							</Accordion>
+									</ChatAccordionContent>
+								</ChatAccordionItem>
+							</ChatAccordion>
 						</div>
 					);
 				}
