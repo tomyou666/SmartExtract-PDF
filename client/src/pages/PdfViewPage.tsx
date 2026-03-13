@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useLocation, useRoute } from 'wouter';
 import { Layout } from '@/components/Layout';
 import { PdfAppLayout } from '@/components/PdfAppLayout';
@@ -9,16 +10,30 @@ export function PdfViewPage() {
 	const [, setLocation] = useLocation();
 	const id = params?.id ?? null;
 
+	const handlePdfSelect = useCallback(
+		(numId: number) => {
+			setLocation(`/pdf/${numId}`);
+		},
+		[setLocation],
+	);
+
+	const handlePdfDelete = useCallback(
+		(deletedId: number) => {
+			if (id !== null && String(deletedId) === id) {
+				setLocation('/');
+			}
+		},
+		[id, setLocation],
+	);
+
 	return (
 		<Layout>
 			<PdfSidebarProvider>
 				<PdfAppLayout
 					pdfArea={<PdfViewer pdfId={id} />}
 					pdfId={id}
-					onPdfSelect={(numId) => setLocation(`/pdf/${numId}`)}
-					onPdfDelete={(deletedId) => {
-						if (id !== null && String(deletedId) === id) setLocation('/');
-					}}
+					onPdfSelect={handlePdfSelect}
+					onPdfDelete={handlePdfDelete}
 				/>
 			</PdfSidebarProvider>
 		</Layout>

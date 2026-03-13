@@ -161,7 +161,7 @@ interface ChatPanelProps {
 	pdfId: string | null;
 }
 
-export function ChatPanel({ pdfId }: ChatPanelProps) {
+export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 	const [loadingSessions, setLoadingSessions] = useState(true);
@@ -769,4 +769,4 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 			</form>
 		</div>
 	);
-}
+});

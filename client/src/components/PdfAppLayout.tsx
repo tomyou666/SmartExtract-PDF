@@ -1,6 +1,13 @@
 import { FileText, Menu, MessageSquare, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+	memo,
+	useCallback,
+	useContext,
+	useEffect,
+	useRef,
+	useState,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { PdfSidebarContext } from '@/contexts/PdfSidebarContext';
 import { cn } from '@/lib/utils';
@@ -21,7 +28,7 @@ interface PdfAppLayoutProps {
 const RIGHT_SIDEBAR_MIN = 200;
 const RIGHT_SIDEBAR_DEFAULT = 320;
 
-export function PdfAppLayout({
+export const PdfAppLayout = memo(function PdfAppLayout({
 	pdfArea,
 	pdfId,
 	onPdfSelect,
@@ -275,4 +282,4 @@ export function PdfAppLayout({
 			</div>
 		</div>
 	);
-}
+});

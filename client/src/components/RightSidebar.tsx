@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { ChatPanel } from './ChatPanel';
 import { PdfImageToolbar } from './PdfImageToolbar';
 import { ExportMdButton } from './ExportMdButton';
@@ -7,7 +8,7 @@ interface RightSidebarProps {
 	pdfId: string | null;
 }
 
-export function RightSidebarHeader() {
+const RightSidebarHeaderInner = () => {
 	const currentSessionId = useChatSessionStore((s) => s.currentSessionId);
 	const currentSessionTitle = useChatSessionStore((s) => s.currentSessionTitle);
 	return (
@@ -18,9 +19,11 @@ export function RightSidebarHeader() {
 			/>
 		</span>
 	);
-}
+};
 
-export function RightSidebar({ pdfId }: RightSidebarProps) {
+export const RightSidebarHeader = memo(RightSidebarHeaderInner);
+
+const RightSidebarInner = ({ pdfId }: RightSidebarProps) => {
 	return (
 		<div className='flex flex-1 flex-col overflow-hidden'>
 			<div className='border-b border-border px-2 py-2'>
@@ -31,4 +34,6 @@ export function RightSidebar({ pdfId }: RightSidebarProps) {
 			</div>
 		</div>
 	);
-}
+};
+
+export const RightSidebar = memo(RightSidebarInner);
