@@ -16,7 +16,19 @@ import {
 	Trash2,
 	X,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { API_BASE } from '@/lib/utils';
 import { useApiKeyStore } from '@/stores/apiKeyStore';
 import { useChatImageStore } from '@/stores/chatImageStore';
@@ -72,15 +84,37 @@ const MessageTurnRow = memo(function MessageTurnRow({
 							</span>
 							<div className='flex items-center gap-0'>
 								{isFirstInTurn && (
-									<Button
-										variant='ghost'
-										size='icon'
-										className='h-6 w-6 text-muted-foreground hover:text-destructive'
-										aria-label='この会話を削除'
-										onClick={() => deleteConversationTurn(turn.id)}
-									>
-										<Trash2 className='h-3 w-3' />
-									</Button>
+									<AlertDialog>
+										<AlertDialogTrigger asChild>
+											<Button
+												variant='ghost'
+												size='icon'
+												className='h-6 w-6 text-muted-foreground hover:text-destructive'
+												aria-label='この会話を削除'
+											>
+												<Trash2 className='h-3 w-3' />
+											</Button>
+										</AlertDialogTrigger>
+										<AlertDialogContent size='sm'>
+											<AlertDialogHeader>
+												<AlertDialogTitle>
+													この会話を削除しますか？
+												</AlertDialogTitle>
+												<AlertDialogDescription>
+													この1件の会話（ユーザーとアシスタントのペア）が削除されます。この操作は取り消せません。
+												</AlertDialogDescription>
+											</AlertDialogHeader>
+											<AlertDialogFooter>
+												<AlertDialogCancel>キャンセル</AlertDialogCancel>
+												<AlertDialogAction
+													variant='destructive'
+													onClick={() => deleteConversationTurn(turn.id)}
+												>
+													削除する
+												</AlertDialogAction>
+											</AlertDialogFooter>
+										</AlertDialogContent>
+									</AlertDialog>
 								)}
 								<Button
 									variant='ghost'
@@ -293,7 +327,6 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 
 	const deleteSession = useCallback(
 		async (sessionId: string) => {
-			if (!confirm('この会話セッションを削除しますか？')) return;
 			try {
 				const res = await fetch(`${API_BASE}/api/chat/sessions/${sessionId}`, {
 					method: 'DELETE',
@@ -307,6 +340,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 					setCurrentSessionId(nextId);
 					setCurrentSession(nextId, nextTitle);
 				}
+				toast.success('セッションを削除しました');
 			} catch {
 				// ignore
 			}
@@ -408,7 +442,14 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 	};
 
 	const copyMessage = (text: string) => {
-		navigator.clipboard.writeText(text);
+		navigator.clipboard
+			.writeText(text)
+			.then(() => {
+				toast.success('コピーしました');
+			})
+			.catch(() => {
+				// ignore
+			});
 	};
 
 	// 1会話 = user + 直後の assistant（1ターン）にまとめる
@@ -429,8 +470,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 
 	const deleteConversationTurn = useCallback(
 		async (messageId: string) => {
-			if (!currentSessionId || !confirm('この1件の会話を削除しますか？'))
-				return;
+			if (!currentSessionId) return;
 			try {
 				const res = await fetch(
 					`${API_BASE}/api/chat/sessions/${currentSessionId}/messages/${messageId}`,
@@ -438,6 +478,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 				);
 				if (!res.ok) return;
 				await fetchMessages(currentSessionId);
+				toast.success('会話を削除しました');
 			} catch {
 				// ignore
 			}
@@ -628,15 +669,37 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 										>
 											<Pencil className='h-3.5 w-3.5' />
 										</Button>
-										<Button
-											variant='ghost'
-											size='icon'
-											className='h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive'
-											aria-label='セッションを削除'
-											onClick={() => deleteSession(currentSessionId)}
-										>
-											<Trash2 className='h-3.5 w-3.5' />
-										</Button>
+										<AlertDialog>
+											<AlertDialogTrigger asChild>
+												<Button
+													variant='ghost'
+													size='icon'
+													className='h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive'
+													aria-label='セッションを削除'
+												>
+													<Trash2 className='h-3.5 w-3.5' />
+												</Button>
+											</AlertDialogTrigger>
+											<AlertDialogContent size='sm'>
+												<AlertDialogHeader>
+													<AlertDialogTitle>
+														このセッションを削除しますか？
+													</AlertDialogTitle>
+													<AlertDialogDescription>
+														このセッション内のすべての会話が削除されます。この操作は取り消せません。
+													</AlertDialogDescription>
+												</AlertDialogHeader>
+												<AlertDialogFooter>
+													<AlertDialogCancel>キャンセル</AlertDialogCancel>
+													<AlertDialogAction
+														variant='destructive'
+														onClick={() => deleteSession(currentSessionId)}
+													>
+														削除する
+													</AlertDialogAction>
+												</AlertDialogFooter>
+											</AlertDialogContent>
+										</AlertDialog>
 									</>
 								)}
 							</>
