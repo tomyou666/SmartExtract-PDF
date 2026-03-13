@@ -3,7 +3,7 @@ import { cjk } from '@streamdown/cjk';
 import { code } from '@streamdown/code';
 import { createMathPlugin } from '@streamdown/math';
 import { mermaid } from '@streamdown/mermaid';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
 import 'katex/dist/katex.min.css';
@@ -23,6 +23,131 @@ import { useChatImageStore } from '@/stores/chatImageStore';
 import { useChatSessionStore } from '@/stores/chatSessionStore';
 
 const mathPlugin = createMathPlugin({ singleDollarTextMath: true });
+
+type MessageTurn = {
+	id: string;
+	messages: any[];
+};
+
+interface MessageTurnRowProps {
+	turn: MessageTurn;
+	allMessages: any[];
+	status: string;
+	copyMessage: (text: string) => void;
+	deleteConversationTurn: (id: string) => void;
+	onScrollToTurnTop: () => void;
+}
+
+const MessageTurnRow = memo(function MessageTurnRow({
+	turn,
+	allMessages,
+	status,
+	copyMessage,
+	deleteConversationTurn,
+	onScrollToTurnTop,
+}: MessageTurnRowProps) {
+	return (
+		<>
+			{turn.messages.map((msg) => {
+				const isLastAssistant =
+					msg.role === 'assistant' &&
+					msg.id === allMessages[allMessages.length - 1]?.id;
+				const streaming = isLastAssistant && status === 'streaming';
+				const textFromParts =
+					msg.parts
+						?.filter((p: { type: string }) => p.type === 'text')
+						.map((p: { text?: string }) => p.text ?? '')
+						.join('') ??
+					msg.content ??
+					'';
+				const assistantText = textFromParts;
+				const userText = textFromParts;
+				const isFirstInTurn = msg.id === turn.messages[0].id;
+				const content = (
+					<>
+						<div className='flex items-center justify-between gap-1'>
+							<span className='text-muted-foreground text-xs font-medium'>
+								{msg.role === 'user' ? 'あなた' : 'アシスタント'}
+							</span>
+							<div className='flex items-center gap-0'>
+								{isFirstInTurn && (
+									<Button
+										variant='ghost'
+										size='icon'
+										className='h-6 w-6 text-muted-foreground hover:text-destructive'
+										aria-label='この会話を削除'
+										onClick={() => deleteConversationTurn(turn.id)}
+									>
+										<Trash2 className='h-3 w-3' />
+									</Button>
+								)}
+								<Button
+									variant='ghost'
+									size='icon'
+									className='h-6 w-6'
+									onClick={() => {
+										const text =
+											msg.parts
+												?.map((p: { type: string; text?: string }) =>
+													p.type === 'text' ? p.text : '',
+												)
+												.filter(Boolean)
+												.join('') ??
+											msg.content ??
+											'';
+										if (text) copyMessage(text);
+									}}
+								>
+									<Copy className='h-3 w-3' />
+								</Button>
+							</div>
+						</div>
+						{msg.role === 'assistant' ? (
+							<Streamdown
+								plugins={{ math: mathPlugin, cjk, code, mermaid }}
+								mode={streaming ? 'streaming' : 'static'}
+								caret='circle'
+								isAnimating={streaming}
+							>
+								{assistantText}
+							</Streamdown>
+						) : msg.role === 'user' ? (
+							<p className='whitespace-pre-wrap text-sm'>{userText}</p>
+						) : null}
+					</>
+				);
+				if (msg.role === 'user') {
+					return (
+						<div
+							key={msg.id}
+							className='sticky top-0 z-20 bg-background/95 pt-1'
+						>
+							<div className='mb-3 ml-4 relative rounded-lg bg-primary/10 p-2 shadow-sm'>
+								<button
+									type='button'
+									aria-label='このターンの位置に移動'
+									className='absolute inset-0 z-0 rounded-lg'
+									onClick={onScrollToTurnTop}
+								/>
+								<div className='relative z-10 pointer-events-none [&_button]:pointer-events-auto'>
+									{content}
+								</div>
+							</div>
+						</div>
+					);
+				}
+				return (
+					<div
+						key={msg.id}
+						className='mb-3 mr-4 rounded-lg bg-muted/50 p-2 relative'
+					>
+						{content}
+					</div>
+				);
+			})}
+		</>
+	);
+});
 
 interface Session {
 	id: string;
@@ -286,8 +411,8 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 	};
 
 	// 1会話 = user + 直後の assistant（1ターン）にまとめる
-	const messageTurns = (() => {
-		const turns: { id: string; messages: typeof messages }[] = [];
+	const messageTurns = useMemo(() => {
+		const turns: MessageTurn[] = [];
 		for (const msg of messages) {
 			if (msg.role === 'user') {
 				turns.push({ id: msg.id, messages: [msg] });
@@ -299,7 +424,7 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 			}
 		}
 		return turns;
-	})();
+	}, [messages]);
 
 	const deleteConversationTurn = useCallback(
 		async (messageId: string) => {
@@ -320,10 +445,26 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 	);
 
 	const formRef = useRef<HTMLFormElement>(null);
+	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const turnRootRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 	const [textareaHeight, setTextareaHeight] = useState(80);
 	const resizeStartY = useRef(0);
 	const resizeStartHeight = useRef(0);
 	const isResizing = useRef(false);
+
+	const scrollTurnToNaturalTop = useCallback((turnId: string) => {
+		const containerEl = scrollContainerRef.current;
+		const turnRootEl = turnRootRefs.current.get(turnId);
+		if (!containerEl || !turnRootEl) return;
+		const containerRect = containerEl.getBoundingClientRect();
+		const turnRect = turnRootEl.getBoundingClientRect();
+		const targetScrollTop =
+			containerEl.scrollTop + (turnRect.top - containerRect.top);
+		containerEl.scrollTo({
+			top: Math.max(0, targetScrollTop),
+			behavior: 'smooth',
+		});
+	}, []);
 
 	const handleResizeMouseDown = useCallback(
 		(e: React.MouseEvent) => {
@@ -503,98 +644,28 @@ export function ChatPanel({ pdfId }: ChatPanelProps) {
 				</div>
 			)}
 
-			<div className='flex-1 overflow-auto p-2'>
+			<div ref={scrollContainerRef} className='flex-1 overflow-auto p-2'>
 				{messageTurns.map((turn) => (
-					<div key={turn.id} className='mb-3 group/turn'>
-						{turn.messages.map((msg) => {
-							const isLastAssistant =
-								msg.role === 'assistant' &&
-								msg.id === messages[messages.length - 1]?.id;
-							const streaming = isLastAssistant && status === 'streaming';
-							const textFromParts =
-								msg.parts
-									?.filter((p: { type: string }) => p.type === 'text')
-									.map((p: { text?: string }) => p.text ?? '')
-									.join('') ??
-								msg.content ??
-								'';
-							const assistantText = textFromParts;
-							const userText = textFromParts;
-							const isFirstInTurn = msg.id === turn.messages[0].id;
-							const content = (
-								<>
-									<div className='flex items-center justify-between gap-1'>
-										<span className='text-muted-foreground text-xs font-medium'>
-											{msg.role === 'user' ? 'あなた' : 'アシスタント'}
-										</span>
-										<div className='flex items-center gap-0'>
-											{isFirstInTurn && (
-												<Button
-													variant='ghost'
-													size='icon'
-													className='h-6 w-6 text-muted-foreground hover:text-destructive'
-													aria-label='この会話を削除'
-													onClick={() => deleteConversationTurn(turn.id)}
-												>
-													<Trash2 className='h-3 w-3' />
-												</Button>
-											)}
-											<Button
-												variant='ghost'
-												size='icon'
-												className='h-6 w-6'
-												onClick={() => {
-													const text =
-														msg.parts
-															?.map((p: { type: string; text?: string }) =>
-																p.type === 'text' ? p.text : '',
-															)
-															.filter(Boolean)
-															.join('') ??
-														msg.content ??
-														'';
-													if (text) copyMessage(text);
-												}}
-											>
-												<Copy className='h-3 w-3' />
-											</Button>
-										</div>
-									</div>
-									{msg.role === 'assistant' ? (
-										<Streamdown
-											plugins={{ math: mathPlugin, cjk, code, mermaid }}
-											mode={streaming ? 'streaming' : 'static'}
-											caret='circle'
-											isAnimating={streaming}
-										>
-											{assistantText}
-										</Streamdown>
-									) : msg.role === 'user' ? (
-										<p className='whitespace-pre-wrap text-sm'>{userText}</p>
-									) : null}
-								</>
-							);
-							if (msg.role === 'user') {
-								return (
-									<div
-										key={msg.id}
-										className='sticky top-0 z-20 bg-background/95 pt-1'
-									>
-										<div className='mb-3 ml-4 rounded-lg bg-primary/10 p-2 shadow-sm'>
-											{content}
-										</div>
-									</div>
-								);
+					<div
+						key={turn.id}
+						className='mb-3 group/turn'
+						data-turn-id={turn.id}
+						ref={(el) => {
+							if (el) {
+								turnRootRefs.current.set(turn.id, el);
+							} else {
+								turnRootRefs.current.delete(turn.id);
 							}
-							return (
-								<div
-									key={msg.id}
-									className='mb-3 mr-4 rounded-lg bg-muted/50 p-2 relative'
-								>
-									{content}
-								</div>
-							);
-						})}
+						}}
+					>
+						<MessageTurnRow
+							turn={turn}
+							allMessages={messages}
+							status={status}
+							copyMessage={copyMessage}
+							deleteConversationTurn={deleteConversationTurn}
+							onScrollToTurnTop={() => scrollTurnToNaturalTop(turn.id)}
+						/>
 					</div>
 				))}
 				{showThinkingPlaceholder && (
