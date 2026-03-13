@@ -23,6 +23,7 @@ import { useChatImageStore } from '@/stores/chatImageStore';
 import { useChatSessionStore } from '@/stores/chatSessionStore';
 
 const mathPlugin = createMathPlugin({ singleDollarTextMath: true });
+const streamdownPlugins = { math: mathPlugin, cjk, code, mermaid };
 
 type MessageTurn = {
 	id: string;
@@ -104,7 +105,7 @@ const MessageTurnRow = memo(function MessageTurnRow({
 						</div>
 						{msg.role === 'assistant' ? (
 							<Streamdown
-								plugins={{ math: mathPlugin, cjk, code, mermaid }}
+								plugins={streamdownPlugins}
 								mode={streaming ? 'streaming' : 'static'}
 								caret='circle'
 								isAnimating={streaming}
