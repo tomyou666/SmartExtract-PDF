@@ -4,7 +4,10 @@ import { scan } from 'react-scan';
 import App from './App';
 import './index.css';
 
-if (import.meta.env.DEV) {
+const isReactScanEnabled =
+	import.meta.env.DEV && import.meta.env.VITE_REACT_SCAN_ENABLED !== 'false';
+
+if (isReactScanEnabled) {
 	scan({
 		enabled: true,
 	});

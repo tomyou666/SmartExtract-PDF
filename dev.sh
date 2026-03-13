@@ -18,9 +18,9 @@ cd /workspace/server
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 &
 SERVER_PID=$!
 
-echo "[dev.sh] Starting Vite dev server..."
+echo "[dev.sh] Starting Vite dev server"
 cd /workspace/client
-bun run dev --host 0.0.0.0 --port 5173 &
+bun run dev:no-scan --host 0.0.0.0 --port 5173 &
 CLIENT_PID=$!
 
 wait $SERVER_PID $CLIENT_PID
