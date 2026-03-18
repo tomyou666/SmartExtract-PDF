@@ -1,0 +1,12 @@
+---
+description: Bun を前提にしたランタイム運用（npm を使わない）
+alwaysApply: true
+---
+
+# Bun Runtime Conventions
+
+- 依存関係の操作は `bun install` を優先し、`npm install` / `npm ci` / `npm uninstall` は使わない。
+- スクリプト実行は `bun run <script>` を使用し、`npm run <script>` を使わない。
+- ロックファイルは `bun.lockb` を正とする（`package-lock.json` を生成・追加しない）。
+- CI やドキュメント内の実行例・手順も `bun` に統一する。
+- もし手元の手順が `npm` 前提なら、その変更提案を先に行って `bun` 相当へ置き換える。
