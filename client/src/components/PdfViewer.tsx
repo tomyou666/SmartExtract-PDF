@@ -34,12 +34,15 @@ interface PdfViewerProps {
 export function PdfViewer({ pdfId }: PdfViewerProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [containerHeight, setContainerHeight] = useState(0);
+	const [isPanning, setIsPanning] = useState(false);
 	const setViewerApi = usePdfViewerStore((s) => s.setViewerApi);
 	const setPdfId = usePdfViewerStore((s) => s.setPdfId);
 	const reset = usePdfViewerStore((s) => s.reset);
 	const setHasEmbeddedOutline = usePdfViewerStore(
 		(s) => s.setHasEmbeddedOutline,
 	);
+	const panToolEnabled = usePdfViewerStore((s) => s.panToolEnabled);
+	const viewerContainerRefObj = usePdfViewerStore((s) => s.viewerContainerRef);
 
 	useEffect(() => {
 		setPdfId(pdfId);
@@ -84,6 +87,193 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 			setViewerApi(null);
 		};
 	}, [setViewerApi, reset]);
+
+	// 手のひらツール（パン）: PDFページ上ドラッグでスクロール（POC優先）
+	useEffect(() => {
+		if (!panToolEnabled) return;
+
+		const outerEl = containerRef.current;
+		const innerEl = viewerContainerRefObj?.current ?? null;
+		const rootEl = innerEl ?? outerEl;
+		if (!rootEl) return;
+
+		type ScrollContainer = HTMLElement;
+		type ScrollStart = {
+			el: ScrollContainer;
+			top: number;
+			left: number;
+		};
+		type DragState = {
+			pointerId: number;
+			startClientX: number;
+			startClientY: number;
+			baselineSynced: boolean; // ズーム直後の一瞬のジャンプ対策: 最初の pointermove で基準同期だけする
+			startScrolls: ScrollStart[];
+		};
+
+		const dragRef = { current: null as DragState | null };
+		let mousedownPrevented = false;
+
+		const isScrollable = (el: HTMLElement) => {
+			const style = window.getComputedStyle(el);
+			const overflowY = style.overflowY;
+			const overflowX = style.overflowX;
+			const canY =
+				/auto|scroll/.test(overflowY) && el.scrollHeight > el.clientHeight + 1;
+			const canX =
+				/auto|scroll/.test(overflowX) && el.scrollWidth > el.clientWidth + 1;
+			return canY || canX;
+		};
+
+		const getScrollContainers = (from: HTMLElement): ScrollContainer[] => {
+			const out: ScrollContainer[] = [];
+			const seen = new Set<HTMLElement>();
+			for (let el: HTMLElement | null = from; el; el = el.parentElement) {
+				if (!(el instanceof HTMLElement)) break;
+				if (seen.has(el)) continue;
+				if (isScrollable(el)) {
+					seen.add(el);
+					out.push(el);
+				}
+				if (el === document.body) break;
+			}
+			return out;
+		};
+
+		const shouldHandleTarget = (target: EventTarget | null) => {
+			if (!target) return false;
+			const el = target as HTMLElement;
+			if (!(el instanceof HTMLElement)) return false;
+			// PDFのページ領域（canvas/page-layer）だけに限定する
+			const surface = el.closest(
+				'.rpv-core__page-layer, .rpv-core__canvas-layer, .rpv-core__page',
+			);
+			if (!surface) return false;
+			// 内部UIは巻き込まない（矩形・OCRテキスト・ボタン等）
+			if (
+				el.closest('[data-selection-rect]') ||
+				el.closest('[data-ocr-text-layer]') ||
+				el.closest('button, input, textarea, select, a, [role="button"]')
+			) {
+				return false;
+			}
+			return rootEl.contains(surface);
+		};
+
+		const readScrollStarts = (
+			scrollContainers: ScrollContainer[],
+		): ScrollStart[] =>
+			scrollContainers.map((el) => ({
+				el,
+				top: el.scrollTop,
+				left: el.scrollLeft,
+			}));
+
+		const onPointerDown = (e: PointerEvent) => {
+			if (e.pointerType === 'mouse' && e.button !== 0) return;
+			if (!shouldHandleTarget(e.target)) return;
+
+			// 他の mousedown 系ハンドラ（矩形描画など）を抑止
+			mousedownPrevented = true;
+
+			e.preventDefault();
+			e.stopPropagation();
+
+			const scrollContainers = getScrollContainers(rootEl);
+			if (scrollContainers.length === 0) return;
+
+			dragRef.current = {
+				pointerId: e.pointerId,
+				startClientX: e.clientX,
+				startClientY: e.clientY,
+				baselineSynced: false,
+				startScrolls: readScrollStarts(scrollContainers),
+			};
+			setIsPanning(true);
+
+			try {
+				rootEl.setPointerCapture(e.pointerId);
+			} catch {
+				// ignore
+			}
+		};
+
+		const applyScrollDelta = (deltaX: number, deltaY: number) => {
+			if (!dragRef.current) return;
+			for (const s of dragRef.current.startScrolls) {
+				const nextLeft = s.left - deltaX;
+				const nextTop = s.top - deltaY;
+
+				const maxLeft = Math.max(0, s.el.scrollWidth - s.el.clientWidth);
+				const maxTop = Math.max(0, s.el.scrollHeight - s.el.clientHeight);
+				s.el.scrollLeft = Math.max(0, Math.min(maxLeft, nextLeft));
+				s.el.scrollTop = Math.max(0, Math.min(maxTop, nextTop));
+			}
+		};
+
+		const onPointerMove = (e: PointerEvent) => {
+			const d = dragRef.current;
+			if (!d) return;
+			if (e.pointerId !== d.pointerId) return;
+			e.preventDefault();
+			e.stopPropagation();
+
+			if (!d.baselineSynced) {
+				// ズーム直後などの一瞬のジャンプを取り込む（最初の move だけ同期して反映しない）
+				d.baselineSynced = true;
+				d.startClientX = e.clientX;
+				d.startClientY = e.clientY;
+				d.startScrolls = readScrollStarts(d.startScrolls.map((s) => s.el));
+				return;
+			}
+
+			const deltaX = e.clientX - d.startClientX;
+			const deltaY = e.clientY - d.startClientY;
+			applyScrollDelta(deltaX, deltaY);
+		};
+
+		const endPan = (e: PointerEvent) => {
+			const d = dragRef.current;
+			if (!d) return;
+			if (e.pointerId !== d.pointerId) return;
+
+			dragRef.current = null;
+			setIsPanning(false);
+			mousedownPrevented = false;
+
+			try {
+				rootEl.releasePointerCapture(e.pointerId);
+			} catch {
+				// ignore
+			}
+		};
+
+		const onMouseDownCapture = (e: MouseEvent) => {
+			if (!mousedownPrevented) return;
+			// pointerdown とセットで押された mousedown を潰す（矩形描画の capture を抑止）
+			if (shouldHandleTarget(e.target)) {
+				e.preventDefault();
+				e.stopPropagation();
+				mousedownPrevented = false;
+			}
+		};
+
+		rootEl.addEventListener('pointerdown', onPointerDown);
+		rootEl.addEventListener('mousedown', onMouseDownCapture, { capture: true });
+		window.addEventListener('pointermove', onPointerMove, { passive: false });
+		window.addEventListener('pointerup', endPan);
+		window.addEventListener('pointercancel', endPan);
+
+		return () => {
+			rootEl.removeEventListener('pointerdown', onPointerDown);
+			rootEl.removeEventListener('mousedown', onMouseDownCapture, {
+				capture: true,
+			});
+			window.removeEventListener('pointermove', onPointerMove as EventListener);
+			window.removeEventListener('pointerup', endPan as EventListener);
+			window.removeEventListener('pointercancel', endPan as EventListener);
+		};
+	}, [panToolEnabled, viewerContainerRefObj]);
 
 	// プラグインは毎レンダーで新しくなるため ref に保持し、effect は mount 時のみ setViewerApi を呼ぶ（無限ループ防止）
 	useEffect(() => {
@@ -131,6 +321,10 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 		<div
 			ref={containerRef}
 			className='pdf-viewer-container flex h-full flex-col overflow-auto bg-muted/30'
+			style={{
+				cursor: panToolEnabled ? (isPanning ? 'grabbing' : 'grab') : undefined,
+				touchAction: panToolEnabled ? 'none' : undefined,
+			}}
 		>
 			<div
 				className='relative w-full'

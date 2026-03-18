@@ -3,6 +3,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Download,
+	Hand,
 	Loader2,
 	Maximize,
 	ScanText,
@@ -26,6 +27,8 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 	const ocrEnabled = usePdfViewerStore((s) => s.ocrEnabled);
 	const setOcrEnabled = usePdfViewerStore((s) => s.setOcrEnabled);
 	const ocrProgress = usePdfViewerStore((s) => s.ocrProgress);
+	const panToolEnabled = usePdfViewerStore((s) => s.panToolEnabled);
+	const setPanToolEnabled = usePdfViewerStore((s) => s.setPanToolEnabled);
 
 	const currentPage = pageIndex + 1;
 	const pageCount = numPages;
@@ -45,6 +48,21 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 	return (
 		<div className='flex h-12 items-center justify-between gap-2 border-t border-border bg-background px-4'>
 			<div className='flex items-center gap-1'>
+				<Button
+					variant='ghost'
+					size='icon'
+					onClick={() => setPanToolEnabled(!panToolEnabled)}
+					disabled={!pdfId}
+					aria-label={
+						panToolEnabled
+							? '手のひらツールをオフにする'
+							: '手のひらツールをオンにする'
+					}
+					aria-pressed={panToolEnabled}
+					title={panToolEnabled ? '手のひら: ON' : '手のひら: OFF'}
+				>
+					<Hand className={`h-4 w-4 ${panToolEnabled ? '' : 'opacity-50'}`} />
+				</Button>
 				<Button
 					variant='ghost'
 					size='icon'

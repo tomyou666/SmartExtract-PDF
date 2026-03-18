@@ -62,6 +62,8 @@ interface PdfViewerState {
 	ocrResults: Record<string, OcrPageResult>;
 	/** OCR 機能の ON/OFF。false のときは enqueue しない */
 	ocrEnabled: boolean;
+	/** 手のひらツール（パン）: true のときページ上ドラッグでスクロール */
+	panToolEnabled: boolean;
 	/** OCR キュー進捗（実行中・待機数・実行中ページ）。表示用 */
 	ocrProgress: {
 		running: number;
@@ -90,6 +92,7 @@ interface PdfViewerState {
 	setLastAutoOrderedRects: (pageIndex: number, rects: SelectionRect[]) => void;
 	setOcrResult: (key: string, result: OcrPageResult | null) => void;
 	setOcrEnabled: (on: boolean) => void;
+	setPanToolEnabled: (on: boolean) => void;
 	setOcrProgress: (v: {
 		running: number;
 		pending: number;
@@ -114,6 +117,7 @@ const initialState = {
 	lastAutoOrderedRectsByPage: {} as Record<number, SelectionRect[]>,
 	ocrResults: {} as Record<string, OcrPageResult>,
 	ocrEnabled: true,
+	panToolEnabled: false,
 	ocrProgress: { running: 0, pending: 0, currentPageIndex: undefined },
 };
 
@@ -183,12 +187,14 @@ export const usePdfViewerStore = create<PdfViewerState>()(
 					return { ocrResults: next };
 				}),
 			setOcrEnabled: (ocrEnabled) => set({ ocrEnabled }),
+			setPanToolEnabled: (panToolEnabled) => set({ panToolEnabled }),
 			setOcrProgress: (ocrProgress) => set({ ocrProgress }),
 			reset: () =>
 				set((s) => ({
 					...initialState,
 					// ユーザー設定として永続化したい項目は reset で潰さない
 					ocrEnabled: s.ocrEnabled,
+					panToolEnabled: s.panToolEnabled,
 					viewerApi: null,
 					pdfId: null,
 					pdfDoc: null,
@@ -203,7 +209,10 @@ export const usePdfViewerStore = create<PdfViewerState>()(
 		{
 			name: PDF_VIEWER_PERSIST_KEY,
 			storage: createJSONStorage(() => window.localStorage),
-			partialize: (s) => ({ ocrEnabled: s.ocrEnabled }),
+			partialize: (s) => ({
+				ocrEnabled: s.ocrEnabled,
+				panToolEnabled: s.panToolEnabled,
+			}),
 			version: 1,
 		},
 	),
