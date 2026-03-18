@@ -1,6 +1,7 @@
 import type { FullScreenPlugin } from '@react-pdf-viewer/full-screen';
 import type { RefObject } from 'react';
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 /** PDF ドキュメント参照（getTextContent スキップ判定用）。react-pdf-viewer の props.doc をそのまま渡す。 */
 export interface PdfDocRef {
@@ -35,6 +36,8 @@ export interface OcrPageResult {
 	}>;
 	hasEmbeddedText?: boolean;
 }
+
+const PDF_VIEWER_PERSIST_KEY = 'pdfViewer';
 
 interface PdfViewerState {
 	/** ズーム・ページ送り用。PdfViewer マウント時にセット、アンマウントで null */
@@ -114,80 +117,94 @@ const initialState = {
 	ocrProgress: { running: 0, pending: 0, currentPageIndex: undefined },
 };
 
-export const usePdfViewerStore = create<PdfViewerState>((set) => ({
-	...initialState,
-	setViewerApi: (viewerApi) => set({ viewerApi }),
-	setPdfId: (pdfId) =>
-		set({
-			pdfId,
-			ocrProgress: { running: 0, pending: 0, currentPageIndex: undefined },
-		}),
-	setPdfDoc: (pdfDoc) => set({ pdfDoc }),
-	setViewerContainerRef: (viewerContainerRef) => set({ viewerContainerRef }),
-	setPageCanvas: (pageIndex, canvas) =>
-		set((s) => {
-			const next = new Map(s.pageCanvases);
-			if (canvas) next.set(pageIndex, canvas);
-			else next.delete(pageIndex);
-			return { pageCanvases: next };
-		}),
-	addSelectionRect: (rect) =>
-		set((s) => ({ selectionRects: [...s.selectionRects, rect] })),
-	updateSelectionRect: (index, rect) =>
-		set((s) => {
-			const next = [...s.selectionRects];
-			if (index >= 0 && index < next.length) next[index] = rect;
-			return { selectionRects: next };
-		}),
-	removeSelectionRect: (index) =>
-		set((s) => ({
-			selectionRects: s.selectionRects.filter((_, i) => i !== index),
-		})),
-	reorderSelectionRects: (fromIndex, toIndex) =>
-		set((s) => {
-			const arr = [...s.selectionRects];
-			const [removed] = arr.splice(fromIndex, 1);
-			arr.splice(toIndex, 0, removed);
-			return { selectionRects: arr };
-		}),
-	clearSelectionRects: () => set({ selectionRects: [] }),
-	replaceSelectionRectsForPage: (pageIndex, rects) =>
-		set((s) => ({
-			selectionRects: [
-				...s.selectionRects.filter((r) => r.pageIndex !== pageIndex),
-				...rects.map((r) => ({ ...r, pageIndex })),
-			],
-		})),
-	setSelectionMode: (selectionMode) => set({ selectionMode }),
-	setDrawingMode: (isDrawingMode) => set({ isDrawingMode }),
-	setHasEmbeddedOutline: (hasEmbeddedOutline) => set({ hasEmbeddedOutline }),
-	setLastAutoOrderedRects: (pageIndex, rects) =>
-		set((s) => ({
-			lastAutoOrderedRectsByPage: {
-				...s.lastAutoOrderedRectsByPage,
-				[pageIndex]: rects,
-			},
-		})),
-	setOcrResult: (key, result) =>
-		set((s) => {
-			const next = { ...s.ocrResults };
-			if (result === null) delete next[key];
-			else next[key] = result;
-			return { ocrResults: next };
-		}),
-	setOcrEnabled: (ocrEnabled) => set({ ocrEnabled }),
-	setOcrProgress: (ocrProgress) => set({ ocrProgress }),
-	reset: () =>
-		set({
+export const usePdfViewerStore = create<PdfViewerState>()(
+	persist(
+		(set) => ({
 			...initialState,
-			viewerApi: null,
-			pdfId: null,
-			pdfDoc: null,
-			pageCanvases: new Map(),
-			selectionRects: [],
-			hasEmbeddedOutline: null,
-			lastAutoOrderedRectsByPage: {},
-			ocrResults: {},
-			ocrProgress: { running: 0, pending: 0, currentPageIndex: undefined },
+			setViewerApi: (viewerApi) => set({ viewerApi }),
+			setPdfId: (pdfId) =>
+				set({
+					pdfId,
+					ocrProgress: { running: 0, pending: 0, currentPageIndex: undefined },
+				}),
+			setPdfDoc: (pdfDoc) => set({ pdfDoc }),
+			setViewerContainerRef: (viewerContainerRef) =>
+				set({ viewerContainerRef }),
+			setPageCanvas: (pageIndex, canvas) =>
+				set((s) => {
+					const next = new Map(s.pageCanvases);
+					if (canvas) next.set(pageIndex, canvas);
+					else next.delete(pageIndex);
+					return { pageCanvases: next };
+				}),
+			addSelectionRect: (rect) =>
+				set((s) => ({ selectionRects: [...s.selectionRects, rect] })),
+			updateSelectionRect: (index, rect) =>
+				set((s) => {
+					const next = [...s.selectionRects];
+					if (index >= 0 && index < next.length) next[index] = rect;
+					return { selectionRects: next };
+				}),
+			removeSelectionRect: (index) =>
+				set((s) => ({
+					selectionRects: s.selectionRects.filter((_, i) => i !== index),
+				})),
+			reorderSelectionRects: (fromIndex, toIndex) =>
+				set((s) => {
+					const arr = [...s.selectionRects];
+					const [removed] = arr.splice(fromIndex, 1);
+					arr.splice(toIndex, 0, removed);
+					return { selectionRects: arr };
+				}),
+			clearSelectionRects: () => set({ selectionRects: [] }),
+			replaceSelectionRectsForPage: (pageIndex, rects) =>
+				set((s) => ({
+					selectionRects: [
+						...s.selectionRects.filter((r) => r.pageIndex !== pageIndex),
+						...rects.map((r) => ({ ...r, pageIndex })),
+					],
+				})),
+			setSelectionMode: (selectionMode) => set({ selectionMode }),
+			setDrawingMode: (isDrawingMode) => set({ isDrawingMode }),
+			setHasEmbeddedOutline: (hasEmbeddedOutline) =>
+				set({ hasEmbeddedOutline }),
+			setLastAutoOrderedRects: (pageIndex, rects) =>
+				set((s) => ({
+					lastAutoOrderedRectsByPage: {
+						...s.lastAutoOrderedRectsByPage,
+						[pageIndex]: rects,
+					},
+				})),
+			setOcrResult: (key, result) =>
+				set((s) => {
+					const next = { ...s.ocrResults };
+					if (result === null) delete next[key];
+					else next[key] = result;
+					return { ocrResults: next };
+				}),
+			setOcrEnabled: (ocrEnabled) => set({ ocrEnabled }),
+			setOcrProgress: (ocrProgress) => set({ ocrProgress }),
+			reset: () =>
+				set((s) => ({
+					...initialState,
+					// ユーザー設定として永続化したい項目は reset で潰さない
+					ocrEnabled: s.ocrEnabled,
+					viewerApi: null,
+					pdfId: null,
+					pdfDoc: null,
+					pageCanvases: new Map(),
+					selectionRects: [],
+					hasEmbeddedOutline: null,
+					lastAutoOrderedRectsByPage: {},
+					ocrResults: {},
+					ocrProgress: { running: 0, pending: 0, currentPageIndex: undefined },
+				})),
 		}),
-}));
+		{
+			name: PDF_VIEWER_PERSIST_KEY,
+			storage: createJSONStorage(() => window.localStorage),
+			partialize: (s) => ({ ocrEnabled: s.ocrEnabled }),
+			version: 1,
+		},
+	),
+);
