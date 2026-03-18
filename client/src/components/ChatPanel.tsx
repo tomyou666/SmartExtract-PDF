@@ -3,8 +3,20 @@ import { cjk } from '@streamdown/cjk';
 import { code } from '@streamdown/code';
 import { createMathPlugin } from '@streamdown/math';
 import { mermaid } from '@streamdown/mermaid';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Streamdown } from 'streamdown';
+import {
+	memo,
+	type RefObject,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
+import {
+	type BlockProps,
+	Streamdown,
+	Block as StreamdownBlock,
+} from 'streamdown';
 import 'streamdown/styles.css';
 import 'katex/dist/katex.min.css';
 import {
@@ -55,6 +67,7 @@ interface MessageTurnRowProps {
 	copyMessage: (text: string) => void;
 	deleteConversationTurn: (id: string) => void;
 	onScrollToTurnTop: () => void;
+	copyBlockContentRef: RefObject<Map<string, string>>;
 }
 
 const MessageTurnRow = memo(function MessageTurnRow({
@@ -64,6 +77,7 @@ const MessageTurnRow = memo(function MessageTurnRow({
 	copyMessage,
 	deleteConversationTurn,
 	onScrollToTurnTop,
+	copyBlockContentRef,
 }: MessageTurnRowProps) {
 	return (
 		<>
@@ -148,14 +162,36 @@ const MessageTurnRow = memo(function MessageTurnRow({
 							</div>
 						</div>
 						{msg.role === 'assistant' ? (
-							<Streamdown
-								plugins={streamdownPlugins}
-								mode={streaming ? 'streaming' : 'static'}
-								caret='circle'
-								isAnimating={streaming}
-							>
-								{assistantText}
-							</Streamdown>
+							(() => {
+								// Wrap Streamdown blocks with stable DOM markers so we can expand selection on copy.
+								const blockComponent = (blockProps: BlockProps) => {
+									const blockKey = `${msg.id}:${blockProps.index}`;
+									copyBlockContentRef.current.set(blockKey, blockProps.content);
+									return (
+										<div
+											data-sd-copy-block='1'
+											data-sd-copy-msg-id={msg.id}
+											data-sd-copy-key={blockKey}
+											style={{ display: 'contents' }}
+										>
+											<StreamdownBlock {...blockProps} />
+										</div>
+									);
+								};
+
+								return (
+									<Streamdown
+										plugins={streamdownPlugins}
+										mode='streaming'
+										caret='circle'
+										isAnimating={streaming}
+										parseIncompleteMarkdown={streaming}
+										BlockComponent={blockComponent}
+									>
+										{assistantText}
+									</Streamdown>
+								);
+							})()
 						) : msg.role === 'user' ? (
 							<p className='whitespace-pre-wrap text-sm'>{userText}</p>
 						) : null}
@@ -299,6 +335,10 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 	const clearImages = useChatImageStore((s) => s.clearImages);
 	const setCurrentSession = useChatSessionStore((s) => s.setCurrentSession);
 
+	// Map used to translate "copy group key" -> original block text (content)
+	// assigned by Streamdown's BlockComponent wrapper.
+	const copyBlockContentRef = useRef<Map<string, string>>(new Map());
+
 	const apiUrl =
 		currentSessionId && typeof API_BASE === 'string'
 			? `${API_BASE}/api/chat/sessions/${currentSessionId}/messages`
@@ -440,7 +480,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 			setEditTitleValue(currentSession?.title ?? '');
 			editTitleInputRef.current?.focus();
 		}
-	}, [editingTitle]);
+	}, [editingTitle, currentSession?.title]);
 
 	useEffect(() => {
 		if (pendingFirstMessage && currentSessionId && messages.length === 0) {
@@ -487,7 +527,8 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 									? [{ type: 'text' as const, text: m.content_json.text }]
 									: []),
 						}));
-						setMessages(uiMessages);
+						// `parts` の型がサーバレスポンス由来で推論しきれないため、UI表示に必要な最低限の形として扱う
+						setMessages(uiMessages as unknown as typeof messages);
 						if (msgs.length > 0) setTitleGeneratedForSessionId(sessionId);
 					},
 				)
@@ -538,6 +579,101 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 				// ignore
 			});
 	};
+
+	const handleCopy = useCallback(
+		(e: React.ClipboardEvent<HTMLDivElement>) => {
+			// Only apply when the Streamdown rendering is stable.
+			if (status === 'streaming' || status === 'submitted') return;
+
+			const sel = window.getSelection();
+			if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+
+			// Avoid hijacking copy inside form controls.
+			const target = e.target as HTMLElement | null;
+			const tag = target?.tagName?.toLowerCase();
+			if (
+				tag === 'textarea' ||
+				tag === 'input' ||
+				tag === 'button' ||
+				tag === 'select' ||
+				target?.closest?.('[role="dialog"]')
+			) {
+				return;
+			}
+
+			const range = sel.getRangeAt(0);
+
+			const getClosestCopyBlock = (n: Node): HTMLElement | null => {
+				const el =
+					n instanceof Element
+						? n
+						: n.parentElement instanceof HTMLElement
+							? n.parentElement
+							: null;
+				return el?.closest?.('[data-sd-copy-block="1"]') ?? null;
+			};
+
+			const startBlockEl = getClosestCopyBlock(range.startContainer);
+			const endBlockEl = getClosestCopyBlock(range.endContainer);
+			if (!startBlockEl || !endBlockEl) {
+				return;
+			}
+
+			const startMsgId = startBlockEl.getAttribute('data-sd-copy-msg-id');
+			const endMsgId = endBlockEl.getAttribute('data-sd-copy-msg-id');
+			if (!startMsgId || startMsgId !== endMsgId) {
+				return;
+			}
+
+			const containerEl = scrollContainerRef.current;
+			if (!containerEl) return;
+
+			const blockEls = Array.from(
+				containerEl.querySelectorAll<HTMLElement>(
+					`[data-sd-copy-block="1"][data-sd-copy-msg-id="${startMsgId}"]`,
+				),
+			);
+			if (blockEls.length === 0) {
+				return;
+			}
+
+			const startIdx = blockEls.findIndex((el) => el === startBlockEl);
+			const endIdx = blockEls.findIndex((el) => el === endBlockEl);
+			if (startIdx < 0 || endIdx < 0) {
+				return;
+			}
+
+			const firstIdx = Math.min(startIdx, endIdx);
+			const lastIdx = Math.max(startIdx, endIdx);
+
+			const rawParts: string[] = [];
+			for (let i = firstIdx; i <= lastIdx; i++) {
+				const key = blockEls[i].getAttribute('data-sd-copy-key');
+				if (!key) continue;
+				rawParts.push(copyBlockContentRef.current.get(key) ?? '');
+			}
+
+			const rawText = rawParts.join('');
+			if (!rawText) {
+				return;
+			}
+
+			// Expand selection to the group boundaries (best-effort).
+			try {
+				const expandedRange = document.createRange();
+				expandedRange.setStartBefore(blockEls[firstIdx]);
+				expandedRange.setEndAfter(blockEls[lastIdx]);
+				sel.removeAllRanges();
+				sel.addRange(expandedRange);
+			} catch {
+				// ignore
+			}
+
+			e.preventDefault();
+			e.clipboardData.setData('text/plain', rawText);
+		},
+		[status],
+	);
 
 	// 1会話 = user + 直後の assistant（1ターン）にまとめる
 	const messageTurns = useMemo(() => {
@@ -802,7 +938,11 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 				</div>
 			)}
 
-			<div ref={scrollContainerRef} className='flex-1 overflow-auto p-2'>
+			<div
+				ref={scrollContainerRef}
+				className='flex-1 overflow-auto p-2'
+				onCopy={handleCopy}
+			>
 				{messageTurns.map((turn) => (
 					<div
 						key={turn.id}
@@ -823,6 +963,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 							copyMessage={copyMessage}
 							deleteConversationTurn={deleteConversationTurn}
 							onScrollToTurnTop={() => scrollTurnToNaturalTop(turn.id)}
+							copyBlockContentRef={copyBlockContentRef}
 						/>
 					</div>
 				))}
@@ -865,7 +1006,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 				{pendingImages.length > 0 && (
 					<div className='mb-1 flex flex-wrap gap-1'>
 						{pendingImages.map((url, i) => (
-							<div key={i} className='relative shrink-0'>
+							<div key={url} className='relative shrink-0'>
 								<img
 									src={url}
 									alt=''
