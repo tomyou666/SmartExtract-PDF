@@ -35,13 +35,14 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [containerHeight, setContainerHeight] = useState(0);
 	const [isPanning, setIsPanning] = useState(false);
+	const panToolEnabled = usePdfViewerStore((s) => s.panToolEnabled);
+	const setPanToolEnabled = usePdfViewerStore((s) => s.setPanToolEnabled);
 	const setViewerApi = usePdfViewerStore((s) => s.setViewerApi);
 	const setPdfId = usePdfViewerStore((s) => s.setPdfId);
 	const reset = usePdfViewerStore((s) => s.reset);
 	const setHasEmbeddedOutline = usePdfViewerStore(
 		(s) => s.setHasEmbeddedOutline,
 	);
-	const panToolEnabled = usePdfViewerStore((s) => s.panToolEnabled);
 	const viewerContainerRefObj = usePdfViewerStore((s) => s.viewerContainerRef);
 
 	useEffect(() => {
@@ -65,9 +66,11 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 	const zoomRef = useRef(zoom);
 	const pageNavRef = useRef(pageNav);
 	const fullScreenRef = useRef(fullScreen);
+	const panToolEnabledRef = useRef(panToolEnabled);
 	zoomRef.current = zoom;
 	pageNavRef.current = pageNav;
 	fullScreenRef.current = fullScreen;
+	panToolEnabledRef.current = panToolEnabled;
 
 	useLayoutEffect(() => {
 		const el = containerRef.current;
@@ -87,6 +90,78 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 			setViewerApi(null);
 		};
 	}, [setViewerApi, reset]);
+
+	// PDF 操作中にのみ有効なショートカット: h を押している間だけ手のひらツールを有効化
+	useEffect(() => {
+		const holdStateRef = { active: false, previousPanToolEnabled: false };
+
+		const isEditableTarget = (target: EventTarget | null) => {
+			if (!(target instanceof HTMLElement)) return false;
+			return (
+				target instanceof HTMLInputElement ||
+				target instanceof HTMLTextAreaElement ||
+				target instanceof HTMLSelectElement ||
+				target.isContentEditable
+			);
+		};
+
+		const canUseShortcutHere = (target: EventTarget | null) => {
+			const rootEl = containerRef.current;
+			if (!rootEl || !pdfId) return false;
+			if (isEditableTarget(target)) return false;
+
+			const activeEl = document.activeElement;
+			const eventInViewer = target instanceof Node && rootEl.contains(target);
+			const focusInViewer =
+				activeEl instanceof Node && rootEl.contains(activeEl);
+			const hoveredViewer = rootEl.matches(':hover');
+			return eventInViewer || focusInViewer || hoveredViewer;
+		};
+
+		const resetHoldState = () => {
+			if (!holdStateRef.active) return;
+			holdStateRef.active = false;
+			setPanToolEnabled(holdStateRef.previousPanToolEnabled);
+		};
+
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key.toLowerCase() !== 'h') return;
+			if (e.altKey || e.ctrlKey || e.metaKey || e.isComposing) return;
+			if (!canUseShortcutHere(e.target)) return;
+
+			e.preventDefault();
+			e.stopPropagation();
+
+			if (holdStateRef.active) return;
+			holdStateRef.active = true;
+			holdStateRef.previousPanToolEnabled = panToolEnabledRef.current;
+			setPanToolEnabled(!holdStateRef.previousPanToolEnabled);
+		};
+
+		const onKeyUp = (e: KeyboardEvent) => {
+			if (e.key.toLowerCase() !== 'h') return;
+			if (!holdStateRef.active) return;
+			e.preventDefault();
+			e.stopPropagation();
+			resetHoldState();
+		};
+
+		const onVisibilityChange = () => {
+			if (document.visibilityState !== 'visible') resetHoldState();
+		};
+
+		window.addEventListener('keydown', onKeyDown);
+		window.addEventListener('keyup', onKeyUp);
+		window.addEventListener('blur', resetHoldState);
+		document.addEventListener('visibilitychange', onVisibilityChange);
+		return () => {
+			window.removeEventListener('keydown', onKeyDown);
+			window.removeEventListener('keyup', onKeyUp);
+			window.removeEventListener('blur', resetHoldState);
+			document.removeEventListener('visibilitychange', onVisibilityChange);
+			resetHoldState();
+		};
+	}, [pdfId, setPanToolEnabled]);
 
 	// 手のひらツール（パン）: PDFページ上ドラッグでスクロール（POC優先）
 	useEffect(() => {

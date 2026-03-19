@@ -59,7 +59,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 							: '手のひらツールをオンにする'
 					}
 					aria-pressed={panToolEnabled}
-					title={panToolEnabled ? '手のひら: ON' : '手のひら: OFF'}
+					title={panToolEnabled ? '手のひら: ON (H)' : '手のひら: OFF (H)'}
 				>
 					<Hand className={`h-4 w-4 ${panToolEnabled ? '' : 'opacity-50'}`} />
 				</Button>
