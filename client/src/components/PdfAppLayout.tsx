@@ -132,6 +132,7 @@ export const PdfAppLayout = memo(function PdfAppLayout({
 									onClick={() => setLeftTab('list')}
 									role='tab'
 									aria-selected={leftTab === 'list'}
+									aria-controls='left-tabpanel-list'
 								>
 									<FileText className='mr-1 h-4 w-4 shrink-0' />
 									<span className='truncate'>PDF一覧</span>
@@ -146,6 +147,7 @@ export const PdfAppLayout = memo(function PdfAppLayout({
 									onClick={() => setLeftTab('thumbnails')}
 									role='tab'
 									aria-selected={leftTab === 'thumbnails'}
+									aria-controls='left-tabpanel-thumbnails'
 								>
 									<span className='truncate'>サムネイル</span>
 								</Button>
@@ -159,30 +161,45 @@ export const PdfAppLayout = memo(function PdfAppLayout({
 									onClick={() => setLeftTab('bookmarks')}
 									role='tab'
 									aria-selected={leftTab === 'bookmarks'}
+									aria-controls='left-tabpanel-bookmarks'
 								>
 									<span className='truncate'>目次</span>
 								</Button>
 							</div>
-							{/* タブコンテンツ */}
-							<div className='flex min-h-0 flex-1 flex-col overflow-auto p-2'>
-								{leftTab === 'list' && (
-									<>
-										<LeftSidebar
-											onPdfSelect={onPdfSelect}
-											onPdfDelete={onPdfDelete}
-										/>
-										<Button
-											variant='ghost'
-											size='sm'
-											className='mt-auto'
-											onClick={() => setSettingsOpen(true)}
-										>
-											<Settings className='mr-1 h-4 w-4' />
-											設定
-										</Button>
-									</>
-								)}
-								{leftTab === 'thumbnails' && (
+							{/* タブコンテンツ: 常にマウントし hidden で切替（スクロール位置を保持） */}
+							<div className='relative min-h-0 flex-1'>
+								<div
+									id='left-tabpanel-list'
+									role='tabpanel'
+									aria-hidden={leftTab !== 'list'}
+									className={cn(
+										'absolute inset-0 flex flex-col overflow-auto p-2',
+										leftTab !== 'list' && 'hidden',
+									)}
+								>
+									<LeftSidebar
+										onPdfSelect={onPdfSelect}
+										onPdfDelete={onPdfDelete}
+									/>
+									<Button
+										variant='ghost'
+										size='sm'
+										className='mt-auto'
+										onClick={() => setSettingsOpen(true)}
+									>
+										<Settings className='mr-1 h-4 w-4' />
+										設定
+									</Button>
+								</div>
+								<div
+									id='left-tabpanel-thumbnails'
+									role='tabpanel'
+									aria-hidden={leftTab !== 'thumbnails'}
+									className={cn(
+										'absolute inset-0 flex min-h-0 flex-col p-2',
+										leftTab !== 'thumbnails' && 'hidden',
+									)}
+								>
 									<div className='flex min-h-0 flex-1 flex-col overflow-auto'>
 										{slots ? (
 											slots.thumbnails
@@ -192,8 +209,16 @@ export const PdfAppLayout = memo(function PdfAppLayout({
 											</p>
 										)}
 									</div>
-								)}
-								{leftTab === 'bookmarks' && (
+								</div>
+								<div
+									id='left-tabpanel-bookmarks'
+									role='tabpanel'
+									aria-hidden={leftTab !== 'bookmarks'}
+									className={cn(
+										'absolute inset-0 flex min-h-0 flex-col p-2',
+										leftTab !== 'bookmarks' && 'hidden',
+									)}
+								>
 									<div className='flex min-h-0 flex-1 flex-col overflow-auto'>
 										{slots ? (
 											slots.bookmarks
@@ -203,7 +228,7 @@ export const PdfAppLayout = memo(function PdfAppLayout({
 											</p>
 										)}
 									</div>
-								)}
+								</div>
 							</div>
 						</div>
 					)}
