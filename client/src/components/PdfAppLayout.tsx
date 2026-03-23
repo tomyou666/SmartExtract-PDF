@@ -1,4 +1,4 @@
-import { FileText, Menu, MessageSquare, Settings } from 'lucide-react';
+import { FileText, LogOut, Menu, MessageSquare, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
 	memo,
@@ -8,9 +8,11 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { PdfSidebarContext } from '@/contexts/PdfSidebarContext';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/authStore';
 import { BottomBar } from './BottomBar';
 import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar, RightSidebarHeader } from './RightSidebar';
@@ -34,6 +36,8 @@ export const PdfAppLayout = memo(function PdfAppLayout({
 	onPdfSelect,
 	onPdfDelete,
 }: PdfAppLayoutProps) {
+	const [, setLocation] = useLocation();
+	const clearToken = useAuthStore((s) => s.clearToken);
 	const [leftOpen, setLeftOpen] = useState(true);
 	const [rightOpen, setRightOpen] = useState(true);
 	const [settingsOpen, setSettingsOpen] = useState(false);
@@ -45,6 +49,11 @@ export const PdfAppLayout = memo(function PdfAppLayout({
 	const startXRef = useRef(0);
 	const startWidthRef = useRef(0);
 	const { slots } = useContext(PdfSidebarContext);
+
+	const handleLogout = useCallback(() => {
+		clearToken();
+		setLocation(import.meta.env.DEV ? '/auth' : '/');
+	}, [clearToken, setLocation]);
 
 	const handleResizeStart = useCallback(
 		(e: React.MouseEvent) => {
@@ -189,6 +198,15 @@ export const PdfAppLayout = memo(function PdfAppLayout({
 									>
 										<Settings className='mr-1 h-4 w-4' />
 										設定
+									</Button>
+									<Button
+										variant='ghost'
+										size='sm'
+										className='mt-1 text-destructive hover:text-destructive'
+										onClick={handleLogout}
+									>
+										<LogOut className='mr-1 h-4 w-4' />
+										ログアウト
 									</Button>
 								</div>
 								<div

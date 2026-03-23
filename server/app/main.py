@@ -2,9 +2,10 @@ import logging
 import sys
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth import UserCreate, UserRead, UserUpdate, auth_backend, fastapi_users
 from app.config import settings as config_settings
 from app.routers import pdfs, settings, chat
 from app.services.storage import storage_service
@@ -32,6 +33,24 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
 )
-app.include_router(pdfs.router)
-app.include_router(settings.router)
-app.include_router(chat.router)
+app.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/api/auth/jwt",
+    tags=["auth"],
+)
+if config_settings.app_env.lower() == "development":
+    app.include_router(
+        fastapi_users.get_register_router(UserRead, UserCreate),
+        prefix="/api/auth",
+        tags=["auth"],
+    )
+app.include_router(
+    fastapi_users.get_users_router(UserRead, UserUpdate),
+    prefix="/api/users",
+    tags=["users"],
+)
+app.include_router(pdfs.router, dependencies=[Depends(fastapi_users.current_user())])
+app.include_router(
+    settings.router, dependencies=[Depends(fastapi_users.current_user())]
+)
+app.include_router(chat.router, dependencies=[Depends(fastapi_users.current_user())])
