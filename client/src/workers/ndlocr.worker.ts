@@ -22,18 +22,24 @@ import {
 	sortBboxesByRank,
 	solve as xyCutSolve,
 } from '../lib/readingOrder';
-import { type Rect, mergeOverlappingBlockRects } from '../lib/rectUtils';
+import { mergeOverlappingBlockRects, type Rect } from '../lib/rectUtils';
 
-// CPU (WASM): 全コアだと重くなるため「論理コアの半分、最低1・最大4」に制限。
-// ※マルチスレッドには crossOriginIsolated が必要（SharedArrayBuffer）。
-const logicalCores =
-	typeof navigator !== 'undefined' && navigator.hardwareConcurrency
-		? navigator.hardwareConcurrency
-		: 4;
-ort.env.wasm.numThreads = Math.min(
-	4,
-	Math.max(1, Math.floor(logicalCores / 2)),
-);
+// // CPU (WASM): 全コアだと重くなるため「論理コアの半分、最低1・最大4」に制限。
+// // ※マルチスレッドには crossOriginIsolated が必要（SharedArrayBuffer）。
+// const logicalCores =
+// 	typeof navigator !== 'undefined' && navigator.hardwareConcurrency
+// 		? navigator.hardwareConcurrency
+// 		: 4;
+// ort.env.wasm.numThreads = Math.min(
+// 	4,
+// 	Math.max(1, Math.floor(logicalCores / 2)),
+// );
+
+// CPU (WASM): Dedicated Worker 内で onnxruntime-web のマルチスレッド WASM（pthread）を使うと
+// InferenceSession.create が完了しないことがある（ランタイム計測で numThreads>1 は afterCreate なし・例外なし）。
+// https://github.com/microsoft/onnxruntime/issues/26858
+// 単一スレッドに固定する。
+ort.env.wasm.numThreads = 1;
 
 const DEIM_MODEL_URL = '/ndlocr-lite/model/deim-s-1024x1024.onnx';
 const PARSEQ_MODEL_URL =
