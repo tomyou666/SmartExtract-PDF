@@ -1,7 +1,7 @@
 import { FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { API_BASE } from '@/lib/utils';
+import { apiUrl, authFetch } from '@/lib/api';
 
 interface ExportMdButtonProps {
 	sessionId: string | null;
@@ -15,8 +15,8 @@ export function ExportMdButton({
 	const exportMd = async () => {
 		if (!sessionId) return;
 		try {
-			const res = await fetch(
-				`${API_BASE}/api/chat/sessions/${sessionId}/messages`,
+			const res = await authFetch(
+				apiUrl(`/api/chat/sessions/${sessionId}/messages`),
 			);
 			if (!res.ok) {
 				toast.error('会話の取得に失敗しました');
@@ -39,7 +39,7 @@ export function ExportMdButton({
 			const md = lines.join('\n');
 			await navigator.clipboard.writeText(md);
 			toast.success('Markdownをクリップボードにコピーしました');
-		} catch (e) {
+		} catch {
 			toast.error('Markdownのコピーに失敗しました');
 		}
 	};
