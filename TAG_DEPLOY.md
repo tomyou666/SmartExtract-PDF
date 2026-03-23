@@ -42,7 +42,7 @@ from app.main import app
   "version": 2,
   "functions": {
     "api/index.py": {
-      "runtime": "python3.12"
+      "runtime": "python3.13"
     }
   },
   "routes": [
