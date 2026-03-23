@@ -13,6 +13,7 @@ jobs:
   deploy-client:
     name: Deploy Client (prod)
     runs-on: ubuntu-latest
+    environment: VERCEL
     defaults:
       run:
         working-directory: client
@@ -47,6 +48,7 @@ jobs:
   deploy-server:
     name: Deploy Server (prod)
     runs-on: ubuntu-latest
+    environment: VERCEL
     defaults:
       run:
         working-directory: server
