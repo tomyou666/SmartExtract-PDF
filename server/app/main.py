@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings as config_settings
 from app.routers import pdfs, settings, chat
+from app.services.storage import storage_service
 
 # アプリ全体のログを標準出力に出す
 logging.basicConfig(
@@ -19,7 +20,7 @@ logging.basicConfig(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    config_settings.upload_dir.mkdir(parents=True, exist_ok=True)
+    storage_service.ensure_ready()
     yield
 
 

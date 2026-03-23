@@ -1,24 +1,18 @@
 import json
 import uuid
-from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.db import get_db
 from app.schemas.pdf import PdfOut
+from app.services.storage import storage_service
 from app.services.toc import extract_toc_with_llm
 
 router = APIRouter(prefix="/api/pdfs", tags=["pdfs"])
-
-
-def ensure_upload_dir() -> Path:
-    settings.upload_dir.mkdir(parents=True, exist_ok=True)
-    return settings.upload_dir
 
 
 @router.post("", response_model=PdfOut)
@@ -28,12 +22,11 @@ async def upload_pdf(
 ) -> PdfOut:
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="PDF file required")
-    ensure_upload_dir()
     stem = uuid.uuid4().hex
     safe_name = f"{stem}_{file.filename}"
-    storage_path = str(settings.upload_dir / safe_name)
+    storage_key = safe_name
     content = await file.read()
-    Path(storage_path).write_bytes(content)
+    storage_path = storage_service.save_bytes(storage_key, content)
     result = await db.execute(
         text(
             "INSERT INTO pdfs (filename, storage_path) VALUES (:filename, :storage_path) RETURNING id, filename, created_at"
@@ -69,9 +62,7 @@ async def delete_pdf(
     row = result.mappings().one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="PDF not found")
-    path = Path(row["storage_path"])
-    if path.exists():
-        path.unlink()
+    storage_service.delete(row["storage_path"])
     await db.execute(text("DELETE FROM pdfs WHERE id = :id"), {"id": pdf_id})
     await db.commit()
 
@@ -91,13 +82,15 @@ async def generate_pdf_toc(
     row = result.mappings().one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="PDF not found")
-    path = Path(row["storage_path"])
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="PDF file not found on disk")
+    if not storage_service.exists(row["storage_path"]):
+        raise HTTPException(status_code=404, detail="PDF file not found on storage")
+    temp_pdf_path = storage_service.download_to_temp(row["storage_path"])
     try:
-        toc_json = await extract_toc_with_llm(path, db)
+        toc_json = await extract_toc_with_llm(temp_pdf_path, db)
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
+    finally:
+        temp_pdf_path.unlink(missing_ok=True)
     await db.execute(
         text("UPDATE pdfs SET toc_json = :toc WHERE id = :id"),
         {"id": pdf_id, "toc": _json_dump(toc_json)},
@@ -144,14 +137,25 @@ async def get_pdf_file(
     row = result.mappings().one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="PDF not found")
-    path = Path(row["storage_path"])
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="PDF file not found on disk")
+    if not storage_service.exists(row["storage_path"]):
+        raise HTTPException(status_code=404, detail="PDF file not found on storage")
     # RFC 5987: filename* で UTF-8 ファイル名を渡す（非ASCII対応、Latin-1 エラー回避）
     encoded_filename = quote(row["filename"], safe="")
     content_disposition = f"inline; filename*=UTF-8''{encoded_filename}"
-    return FileResponse(
-        path,
+    file_obj = storage_service.open_read(row["storage_path"])
+
+    def _iter_stream():
+        try:
+            while True:
+                chunk = file_obj.read(1024 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            file_obj.close()
+
+    return StreamingResponse(
+        _iter_stream(),
         media_type="application/pdf",
         headers={"Content-Disposition": content_disposition},
     )

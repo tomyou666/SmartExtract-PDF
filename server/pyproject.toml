@@ -16,6 +16,8 @@ dependencies = [
     "python-multipart>=0.0.9",
     "pypdf>=6.7.4",
     "pikepdf>=10.3.0",
+    "fsspec>=2026.2.0",
+    "s3fs>=2026.2.0",
 ]
 
 [project.optional-dependencies]
