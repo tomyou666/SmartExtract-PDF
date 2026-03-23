@@ -12,8 +12,8 @@ import {
 	AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { apiUrl, authFetch } from '@/lib/api';
 import { clearOcrCacheDatabase } from '@/lib/ocrCache';
-import { API_BASE } from '@/lib/utils';
 import { useApiKeyStore } from '@/stores/apiKeyStore';
 
 interface ProviderOption {
@@ -42,8 +42,8 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
 			setModels([]);
 			return;
 		}
-		fetch(
-			`${API_BASE}/api/settings/llm/models?provider=${encodeURIComponent(p)}`,
+		authFetch(
+			apiUrl(`/api/settings/llm/models?provider=${encodeURIComponent(p)}`),
 		)
 			.then((r) => r.json())
 			.then((data: { models: string[] }) => setModels(data.models ?? []))
@@ -53,13 +53,13 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
 	useEffect(() => {
 		if (!open) return;
 		// LLM 設定の読み込み
-		fetch(`${API_BASE}/api/settings/llm/providers`)
+		authFetch(apiUrl('/api/settings/llm/providers'))
 			.then((r) => r.json())
 			.then((data: ProviderOption[]) =>
 				setProviders(Array.isArray(data) ? data : []),
 			)
 			.catch(() => setProviders([]));
-		fetch(`${API_BASE}/api/settings/llm`)
+		authFetch(apiUrl('/api/settings/llm'))
 			.then((r) => r.json())
 			.then(
 				(data: {
@@ -98,7 +98,7 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
 			model,
 		};
 		if (apiKey && apiKey !== '********') body.api_key = apiKey;
-		const res = await fetch(`${API_BASE}/api/settings/llm`, {
+		const res = await authFetch(apiUrl('/api/settings/llm'), {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body),
