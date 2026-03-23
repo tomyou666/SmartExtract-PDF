@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { FileText, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { API_BASE } from '@/lib/utils';
+import { apiUrl, authFetch } from '@/lib/api';
 
 interface PdfItem {
 	id: number;
@@ -21,7 +21,7 @@ export function LeftSidebar({ onPdfSelect, onPdfDelete }: LeftSidebarProps) {
 	const [deletingId, setDeletingId] = useState<number | null>(null);
 
 	useEffect(() => {
-		fetch(`${API_BASE}/api/pdfs`)
+		authFetch(apiUrl('/api/pdfs'))
 			.then((r) => r.json())
 			.then((data: PdfItem[]) => {
 				setPdfs(data);
@@ -39,7 +39,7 @@ export function LeftSidebar({ onPdfSelect, onPdfDelete }: LeftSidebarProps) {
 			if (!file) return;
 			const form = new FormData();
 			form.append('file', file);
-			const res = await fetch(`${API_BASE}/api/pdfs`, {
+			const res = await authFetch(apiUrl('/api/pdfs'), {
 				method: 'POST',
 				body: form,
 			});
@@ -58,7 +58,7 @@ export function LeftSidebar({ onPdfSelect, onPdfDelete }: LeftSidebarProps) {
 		if (!confirm(`「${pdf.filename}」を削除してもよろしいですか？`)) return;
 		setDeletingId(pdf.id);
 		try {
-			const res = await fetch(`${API_BASE}/api/pdfs/${pdf.id}`, {
+			const res = await authFetch(apiUrl(`/api/pdfs/${pdf.id}`), {
 				method: 'DELETE',
 			});
 			if (res.ok) {

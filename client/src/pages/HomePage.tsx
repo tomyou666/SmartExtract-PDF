@@ -1,15 +1,14 @@
 import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { Layout } from '@/components/Layout';
-import { LeftSidebar } from '@/components/LeftSidebar';
 import { PdfAppLayout } from '@/components/PdfAppLayout';
-import { API_BASE } from '@/lib/utils';
+import { apiUrl, authFetch } from '@/lib/api';
 
 export function HomePage() {
 	const [, setLocation] = useLocation();
 
 	useEffect(() => {
-		fetch(`${API_BASE}/api/pdfs`)
+		authFetch(apiUrl('/api/pdfs'))
 			.then((r) => r.json())
 			.then((pdfs: { id: number }[]) => {
 				if (pdfs.length > 0) {

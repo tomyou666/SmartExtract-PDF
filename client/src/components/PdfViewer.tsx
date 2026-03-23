@@ -22,8 +22,9 @@ import workerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
 import { TocPanel } from '@/components/TocPanel';
 import { PdfSidebarContext } from '@/contexts/PdfSidebarContext';
-import { API_BASE } from '@/lib/utils';
+import { apiUrl, getAuthHeaderValue } from '@/lib/api';
 import { toolbarSyncPlugin } from '@/plugins/toolbarSyncPlugin';
+import { useAuthStore } from '@/stores/authStore';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
 import { useThemeStore } from '@/stores/themeStore';
 
@@ -43,6 +44,7 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 	const setHasEmbeddedOutline = usePdfViewerStore(
 		(s) => s.setHasEmbeddedOutline,
 	);
+	const authToken = useAuthStore((s) => s.token);
 	const viewerContainerRefObj = usePdfViewerStore((s) => s.viewerContainerRef);
 
 	useEffect(() => {
@@ -362,7 +364,7 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 		return () => setViewerApi(null);
 	}, [setViewerApi]);
 
-	const url = pdfId ? `${API_BASE}/api/pdfs/${pdfId}` : null;
+	const url = pdfId ? apiUrl(`/api/pdfs/${pdfId}`) : null;
 
 	// url/pdfId が変わったときだけスロットを更新。bookmark/thumbnail を依存に含めると setSlots の無限ループになる
 	// biome-ignore lint/correctness/useExhaustiveDependencies: 上記の理由で bookmark/thumbnail を意図的に除外
@@ -408,7 +410,18 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 				}}
 			>
 				<Worker workerUrl={workerSrc}>
-					<Viewer fileUrl={url} plugins={plugins} theme={theme} />
+					<Viewer
+						fileUrl={url}
+						plugins={plugins}
+						theme={theme}
+						httpHeaders={
+							authToken
+								? {
+										Authorization: getAuthHeaderValue() ?? '',
+									}
+								: undefined
+						}
+					/>
 				</Worker>
 			</div>
 		</div>

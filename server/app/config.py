@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     aws_region: str | None = None
     aws_endpoint_url: str | None = None
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    app_env: str = ""  # development | production
+    auth_secret: str = "change-me-in-production"
+    auth_token_lifetime_seconds: int = 60 * 60 * 24
 
 
 settings = Settings()

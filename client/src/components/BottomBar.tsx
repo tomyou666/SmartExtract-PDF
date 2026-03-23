@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
-import { API_BASE } from '@/lib/utils';
+import { apiUrl, authFetch } from '@/lib/api';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
 
 interface BottomBarProps {
@@ -39,10 +39,14 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 	const onPagePrev = () => api?.jumpToPreviousPage();
 	const onPageNext = () => api?.jumpToNextPage();
 
-	const onDownload = () => {
+	const onDownload = async () => {
 		if (!pdfId) return;
-		const url = `${API_BASE}/api/pdfs/${pdfId}`;
-		window.open(url, '_blank', 'noopener');
+		const res = await authFetch(apiUrl(`/api/pdfs/${pdfId}`));
+		if (!res.ok) return;
+		const blob = await res.blob();
+		const blobUrl = URL.createObjectURL(blob);
+		window.open(blobUrl, '_blank', 'noopener');
+		setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
 	};
 
 	return (

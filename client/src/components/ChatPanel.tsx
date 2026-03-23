@@ -1,8 +1,9 @@
 import { useChat } from '@ai-sdk/react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { API_BASE } from '@/lib/utils';
+import { apiUrl, authFetch } from '@/lib/api';
 import { useApiKeyStore } from '@/stores/apiKeyStore';
+import { useAuthStore } from '@/stores/authStore';
 import { useChatImageStore } from '@/stores/chatImageStore';
 import { useChatSessionStore } from '@/stores/chatSessionStore';
 import { ChatComposer } from './chat/ChatComposer';
@@ -29,15 +30,15 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 	const removeImage = useChatImageStore((s) => s.removeImage);
 	const clearImages = useChatImageStore((s) => s.clearImages);
 	const setCurrentSession = useChatSessionStore((s) => s.setCurrentSession);
+	const authToken = useAuthStore((s) => s.token);
 
 	// Map used to translate "copy group key" -> original block text (content)
 	// assigned by Streamdown's BlockComponent wrapper.
 	const copyBlockContentRef = useRef<Map<string, string>>(new Map());
 
-	const apiUrl =
-		currentSessionId && typeof API_BASE === 'string'
-			? `${API_BASE}/api/chat/sessions/${currentSessionId}/messages`
-			: '/api/chat/sessions/__placeholder__/messages';
+	const chatApiUrl = currentSessionId
+		? apiUrl(`/api/chat/sessions/${currentSessionId}/messages`)
+		: '/api/chat/sessions/__placeholder__/messages';
 
 	const [titleGeneratedForSessionId, setTitleGeneratedForSessionId] = useState<
 		string | null
@@ -45,16 +46,21 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 
 	const { messages, append, setMessages, status, error, setInput, input } =
 		useChat({
-			api: apiUrl,
+			api: chatApiUrl,
 			id: currentSessionId ?? undefined,
 			streamProtocol: 'text',
 			initialMessages: [],
+			headers: authToken
+				? {
+						Authorization: `Bearer ${authToken}`,
+					}
+				: undefined,
 			onFinish: async () => {
 				if (!currentSessionId) return;
 				try {
 					if (titleGeneratedForSessionId !== currentSessionId) {
-						const res = await fetch(
-							`${API_BASE}/api/chat/sessions/${currentSessionId}/title`,
+						const res = await authFetch(
+							apiUrl(`/api/chat/sessions/${currentSessionId}/title`),
 							{
 								method: 'POST',
 								headers: { 'Content-Type': 'application/json' },
@@ -64,11 +70,14 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 						if (res.ok) {
 							setTitleGeneratedForSessionId(currentSessionId);
 							const { title } = await res.json();
-							await fetch(`${API_BASE}/api/chat/sessions/${currentSessionId}`, {
-								method: 'PATCH',
-								headers: { 'Content-Type': 'application/json' },
-								body: JSON.stringify({ title }),
-							});
+							await authFetch(
+								apiUrl(`/api/chat/sessions/${currentSessionId}`),
+								{
+									method: 'PATCH',
+									headers: { 'Content-Type': 'application/json' },
+									body: JSON.stringify({ title }),
+								},
+							);
 							fetchSessions();
 						}
 					}
@@ -82,7 +91,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 
 	const fetchSessions = useCallback(async () => {
 		try {
-			const res = await fetch(`${API_BASE}/api/chat/sessions`);
+			const res = await authFetch(apiUrl('/api/chat/sessions'));
 			if (res.ok) {
 				const data = await res.json();
 				setSessions(data);
@@ -97,7 +106,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 	}, [fetchSessions]);
 
 	useEffect(() => {
-		fetch(`${API_BASE}/api/settings/llm`)
+		authFetch(apiUrl('/api/settings/llm'))
 			.then((r) => (r.ok ? r.json() : Promise.reject(r)))
 			.then((data: { api_key_masked?: boolean }) =>
 				setApiKeyConfigured(Boolean(data.api_key_masked)),
@@ -121,8 +130,8 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 			const trimmed = newTitle.trim();
 			if (trimmed === '') return;
 			try {
-				const res = await fetch(
-					`${API_BASE}/api/chat/sessions/${currentSessionId}`,
+				const res = await authFetch(
+					apiUrl(`/api/chat/sessions/${currentSessionId}`),
 					{
 						method: 'PATCH',
 						headers: { 'Content-Type': 'application/json' },
@@ -147,7 +156,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 	const deleteSession = useCallback(
 		async (sessionId: string) => {
 			try {
-				const res = await fetch(`${API_BASE}/api/chat/sessions/${sessionId}`, {
+				const res = await authFetch(apiUrl(`/api/chat/sessions/${sessionId}`), {
 					method: 'DELETE',
 				});
 				if (!res.ok) return;
@@ -191,7 +200,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 
 	const fetchMessages = useCallback(
 		(sessionId: string, options?: { isCancelled?: () => boolean }) =>
-			fetch(`${API_BASE}/api/chat/sessions/${sessionId}/messages`)
+			authFetch(apiUrl(`/api/chat/sessions/${sessionId}/messages`))
 				.then((r) => r.json())
 				.then(
 					(
@@ -235,7 +244,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 
 	const createSession = async () => {
 		try {
-			const res = await fetch(`${API_BASE}/api/chat/sessions`, {
+			const res = await authFetch(apiUrl('/api/chat/sessions'), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -291,8 +300,10 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 		async (messageId: string) => {
 			if (!currentSessionId) return;
 			try {
-				const res = await fetch(
-					`${API_BASE}/api/chat/sessions/${currentSessionId}/messages/${messageId}`,
+				const res = await authFetch(
+					apiUrl(
+						`/api/chat/sessions/${currentSessionId}/messages/${messageId}`,
+					),
 					{ method: 'DELETE' },
 				);
 				if (!res.ok) return;
