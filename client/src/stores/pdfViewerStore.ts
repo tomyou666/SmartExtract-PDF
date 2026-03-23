@@ -116,7 +116,7 @@ const initialState = {
 	hasEmbeddedOutline: null as boolean | null,
 	lastAutoOrderedRectsByPage: {} as Record<number, SelectionRect[]>,
 	ocrResults: {} as Record<string, OcrPageResult>,
-	ocrEnabled: true,
+	ocrEnabled: false,
 	panToolEnabled: false,
 	ocrProgress: { running: 0, pending: 0, currentPageIndex: undefined },
 };
