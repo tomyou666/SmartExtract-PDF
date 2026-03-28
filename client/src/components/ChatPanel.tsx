@@ -1,7 +1,7 @@
 import { useChat } from '@ai-sdk/react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { API_BASE } from '@/lib/utils';
+import { useChatApi, useLlmSettingsApi } from '@/contexts/AppApiContext';
 import { useApiKeyStore } from '@/stores/apiKeyStore';
 import { useChatImageStore } from '@/stores/chatImageStore';
 import { useChatSessionStore } from '@/stores/chatSessionStore';
@@ -15,6 +15,8 @@ interface ChatPanelProps {
 }
 
 export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
+	const chat = useChatApi();
+	const llmSettings = useLlmSettingsApi();
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 	const [loadingSessions, setLoadingSessions] = useState(true);
@@ -34,10 +36,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 	// assigned by Streamdown's BlockComponent wrapper.
 	const copyBlockContentRef = useRef<Map<string, string>>(new Map());
 
-	const apiUrl =
-		currentSessionId && typeof API_BASE === 'string'
-			? `${API_BASE}/api/chat/sessions/${currentSessionId}/messages`
-			: '/api/chat/sessions/__placeholder__/messages';
+	const apiUrl = chat.messagesStreamUrl(currentSessionId);
 
 	const [titleGeneratedForSessionId, setTitleGeneratedForSessionId] = useState<
 		string | null
@@ -53,23 +52,11 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 				if (!currentSessionId) return;
 				try {
 					if (titleGeneratedForSessionId !== currentSessionId) {
-						const res = await fetch(
-							`${API_BASE}/api/chat/sessions/${currentSessionId}/title`,
-							{
-								method: 'POST',
-								headers: { 'Content-Type': 'application/json' },
-								body: '{}',
-							},
-						);
-						if (res.ok) {
+						const suggested = await chat.suggestSessionTitle(currentSessionId);
+						if (suggested) {
 							setTitleGeneratedForSessionId(currentSessionId);
-							const { title } = await res.json();
-							await fetch(`${API_BASE}/api/chat/sessions/${currentSessionId}`, {
-								method: 'PATCH',
-								headers: { 'Content-Type': 'application/json' },
-								body: JSON.stringify({ title }),
-							});
-							fetchSessions();
+							await chat.updateSessionTitle(currentSessionId, suggested.title);
+							await fetchSessions();
 						}
 					}
 					// 送信済みメッセージにサーバー側の id を反映するため再取得
@@ -82,28 +69,25 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 
 	const fetchSessions = useCallback(async () => {
 		try {
-			const res = await fetch(`${API_BASE}/api/chat/sessions`);
-			if (res.ok) {
-				const data = await res.json();
-				setSessions(data);
-			}
+			const data = await chat.listSessions();
+			setSessions(data);
+		} catch {
+			// 失敗時は既存の一覧を維持（従来の fetch + res.ok と同じ）
 		} finally {
 			setLoadingSessions(false);
 		}
-	}, []);
+	}, [chat]);
 
 	useEffect(() => {
 		fetchSessions();
 	}, [fetchSessions]);
 
 	useEffect(() => {
-		fetch(`${API_BASE}/api/settings/llm`)
-			.then((r) => (r.ok ? r.json() : Promise.reject(r)))
-			.then((data: { api_key_masked?: boolean }) =>
-				setApiKeyConfigured(Boolean(data.api_key_masked)),
-			)
+		llmSettings
+			.getSettings()
+			.then((data) => setApiKeyConfigured(Boolean(data?.api_key_masked)))
 			.catch(() => setApiKeyConfigured(false));
-	}, [setApiKeyConfigured]);
+	}, [llmSettings, setApiKeyConfigured]);
 
 	useEffect(() => {
 		if (currentSessionId) {
@@ -121,15 +105,8 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 			const trimmed = newTitle.trim();
 			if (trimmed === '') return;
 			try {
-				const res = await fetch(
-					`${API_BASE}/api/chat/sessions/${currentSessionId}`,
-					{
-						method: 'PATCH',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ title: trimmed }),
-					},
-				);
-				if (res.ok) {
+				const ok = await chat.updateSessionTitle(currentSessionId, trimmed);
+				if (ok) {
 					setCurrentSession(currentSessionId, trimmed);
 					setSessions((prev) =>
 						prev.map((s) =>
@@ -141,16 +118,14 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 				// ignore
 			}
 		},
-		[currentSessionId, setCurrentSession],
+		[chat, currentSessionId, setCurrentSession],
 	);
 
 	const deleteSession = useCallback(
 		async (sessionId: string) => {
 			try {
-				const res = await fetch(`${API_BASE}/api/chat/sessions/${sessionId}`, {
-					method: 'DELETE',
-				});
-				if (!res.ok) return;
+				const ok = await chat.deleteSession(sessionId);
+				if (!ok) return;
 				setSessions((prev) => prev.filter((s) => s.id !== sessionId));
 				if (currentSessionId === sessionId) {
 					const remaining = sessions.filter((s) => s.id !== sessionId);
@@ -164,7 +139,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 				// ignore
 			}
 		},
-		[currentSessionId, sessions, setCurrentSession],
+		[chat, currentSessionId, sessions, setCurrentSession],
 	);
 
 	useEffect(() => {
@@ -191,34 +166,26 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 
 	const fetchMessages = useCallback(
 		(sessionId: string, options?: { isCancelled?: () => boolean }) =>
-			fetch(`${API_BASE}/api/chat/sessions/${sessionId}/messages`)
-				.then((r) => r.json())
-				.then(
-					(
-						msgs: {
-							id: string;
-							role: string;
-							content_json: { text?: string; parts?: unknown[] };
-						}[],
-					) => {
-						if (options?.isCancelled?.()) return;
-						const uiMessages = msgs.map((m) => ({
-							id: m.id,
-							role: m.role as 'user' | 'assistant' | 'system',
-							content: m.content_json?.text ?? '',
-							parts:
-								m.content_json?.parts ??
-								(m.content_json?.text
-									? [{ type: 'text' as const, text: m.content_json.text }]
-									: []),
-						}));
-						// `parts` の型がサーバレスポンス由来で推論しきれないため、UI表示に必要な最低限の形として扱う
-						setMessages(uiMessages as unknown as typeof messages);
-						if (msgs.length > 0) setTitleGeneratedForSessionId(sessionId);
-					},
-				)
+			chat
+				.listMessages(sessionId)
+				.then((msgs) => {
+					if (options?.isCancelled?.()) return;
+					const uiMessages = msgs.map((m) => ({
+						id: m.id,
+						role: m.role as 'user' | 'assistant' | 'system',
+						content: m.content_json?.text ?? '',
+						parts:
+							m.content_json?.parts ??
+							(m.content_json?.text
+								? [{ type: 'text' as const, text: m.content_json.text }]
+								: []),
+					}));
+					// `parts` の型がサーバレスポンス由来で推論しきれないため、UI表示に必要な最低限の形として扱う
+					setMessages(uiMessages as unknown as typeof messages);
+					if (msgs.length > 0) setTitleGeneratedForSessionId(sessionId);
+				})
 				.catch(() => {}),
-		[setMessages],
+		[chat, setMessages],
 	);
 
 	useEffect(() => {
@@ -235,16 +202,11 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 
 	const createSession = async () => {
 		try {
-			const res = await fetch(`${API_BASE}/api/chat/sessions`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					pdf_id: pdfId ? Number(pdfId) : null,
-					title: '新規チャット',
-				}),
+			const session = await chat.createSession({
+				pdfId: pdfId ? Number(pdfId) : null,
+				title: '新規チャット',
 			});
-			if (res.ok) {
-				const session = await res.json();
+			if (session) {
 				setSessions((prev) => [session, ...prev]);
 				setCurrentSessionId(session.id);
 				setCurrentSession(session.id, session.title);
@@ -291,18 +253,15 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 		async (messageId: string) => {
 			if (!currentSessionId) return;
 			try {
-				const res = await fetch(
-					`${API_BASE}/api/chat/sessions/${currentSessionId}/messages/${messageId}`,
-					{ method: 'DELETE' },
-				);
-				if (!res.ok) return;
+				const ok = await chat.deleteMessage(currentSessionId, messageId);
+				if (!ok) return;
 				await fetchMessages(currentSessionId);
 				toast.success('会話を削除しました');
 			} catch {
 				// ignore
 			}
 		},
-		[currentSessionId, fetchMessages],
+		[chat, currentSessionId, fetchMessages],
 	);
 
 	const sendWithAttachments = async (e: React.FormEvent) => {

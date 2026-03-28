@@ -12,8 +12,8 @@ import {
 	AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { useLlmSettingsApi } from '@/contexts/AppApiContext';
 import { clearOcrCacheDatabase } from '@/lib/ocrCache';
-import { API_BASE } from '@/lib/utils';
 import { useApiKeyStore } from '@/stores/apiKeyStore';
 
 interface ProviderOption {
@@ -27,6 +27,7 @@ interface SettingsSheetProps {
 }
 
 export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
+	const llmSettings = useLlmSettingsApi();
 	const setApiKeyConfigured = useApiKeyStore((s) => s.setApiKeyConfigured);
 	const [providers, setProviders] = useState<ProviderOption[]>([]);
 	const [models, setModels] = useState<string[]>([]);
@@ -37,46 +38,40 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
 	const [clearingCache, setClearingCache] = useState(false);
 	const [cacheCleared, setCacheCleared] = useState(false);
 
-	const fetchModelsForProvider = useCallback((p: string) => {
-		if (!p) {
-			setModels([]);
-			return;
-		}
-		fetch(
-			`${API_BASE}/api/settings/llm/models?provider=${encodeURIComponent(p)}`,
-		)
-			.then((r) => r.json())
-			.then((data: { models: string[] }) => setModels(data.models ?? []))
-			.catch(() => setModels([]));
-	}, []);
+	const fetchModelsForProvider = useCallback(
+		(p: string) => {
+			if (!p) {
+				setModels([]);
+				return;
+			}
+			llmSettings
+				.listModels(p)
+				.then((names) => setModels(names))
+				.catch(() => setModels([]));
+		},
+		[llmSettings],
+	);
 
 	useEffect(() => {
 		if (!open) return;
 		// LLM 設定の読み込み
-		fetch(`${API_BASE}/api/settings/llm/providers`)
-			.then((r) => r.json())
-			.then((data: ProviderOption[]) =>
-				setProviders(Array.isArray(data) ? data : []),
-			)
+		llmSettings
+			.listProviders()
+			.then((data) => setProviders(Array.isArray(data) ? data : []))
 			.catch(() => setProviders([]));
-		fetch(`${API_BASE}/api/settings/llm`)
-			.then((r) => r.json())
-			.then(
-				(data: {
-					provider: string;
-					model: string;
-					api_key_masked?: boolean;
-				}) => {
-					const p = data.provider ?? 'openai';
-					const m = data.model ?? '';
-					setProvider(p);
-					setModel(m);
-					setApiKey(data.api_key_masked ? '********' : '');
-					fetchModelsForProvider(p);
-				},
-			)
+		llmSettings
+			.getSettings()
+			.then((data) => {
+				if (!data) return;
+				const p = data.provider ?? 'openai';
+				const m = data.model ?? '';
+				setProvider(p);
+				setModel(m);
+				setApiKey(data.api_key_masked ? '********' : '');
+				fetchModelsForProvider(p);
+			})
 			.catch(() => {});
-	}, [open, fetchModelsForProvider]);
+	}, [open, fetchModelsForProvider, llmSettings]);
 
 	// モデル一覧が変わったときのフォールバック
 	useEffect(() => {
@@ -98,12 +93,8 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
 			model,
 		};
 		if (apiKey && apiKey !== '********') body.api_key = apiKey;
-		const res = await fetch(`${API_BASE}/api/settings/llm`, {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(body),
-		});
-		if (res.ok) {
+		const ok = await llmSettings.saveSettings(body);
+		if (ok) {
 			setSaved(true);
 			setTimeout(() => setSaved(false), 2000);
 			if (body.api_key !== undefined) {

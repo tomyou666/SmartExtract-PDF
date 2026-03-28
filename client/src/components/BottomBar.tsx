@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
-import { API_BASE } from '@/lib/utils';
+import { usePdfApi } from '@/contexts/AppApiContext';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
 
 interface BottomBarProps {
@@ -20,6 +20,7 @@ interface BottomBarProps {
 }
 
 export function BottomBar({ pdfId }: BottomBarProps) {
+	const pdfApi = usePdfApi();
 	const api = usePdfViewerStore((s) => s.viewerApi);
 	const pageIndex = usePdfViewerStore((s) => s.pageIndex);
 	const scale = usePdfViewerStore((s) => s.scale);
@@ -41,8 +42,7 @@ export function BottomBar({ pdfId }: BottomBarProps) {
 
 	const onDownload = () => {
 		if (!pdfId) return;
-		const url = `${API_BASE}/api/pdfs/${pdfId}`;
-		window.open(url, '_blank', 'noopener');
+		window.open(pdfApi.getDocumentUrl(pdfId), '_blank', 'noopener');
 	};
 
 	return (

@@ -1,23 +1,23 @@
 import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { Layout } from '@/components/Layout';
-import { LeftSidebar } from '@/components/LeftSidebar';
 import { PdfAppLayout } from '@/components/PdfAppLayout';
-import { API_BASE } from '@/lib/utils';
+import { usePdfApi } from '@/contexts/AppApiContext';
 
 export function HomePage() {
 	const [, setLocation] = useLocation();
+	const pdfApi = usePdfApi();
 
 	useEffect(() => {
-		fetch(`${API_BASE}/api/pdfs`)
-			.then((r) => r.json())
-			.then((pdfs: { id: number }[]) => {
+		pdfApi
+			.list()
+			.then((pdfs) => {
 				if (pdfs.length > 0) {
 					setLocation(`/pdf/${pdfs[0].id}`);
 				}
 			})
 			.catch(() => {});
-	}, [setLocation]);
+	}, [setLocation, pdfApi]);
 
 	return (
 		<Layout>

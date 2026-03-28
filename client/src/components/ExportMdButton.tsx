@@ -1,7 +1,7 @@
 import { FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { API_BASE } from '@/lib/utils';
+import { useChatApi } from '@/contexts/AppApiContext';
 
 interface ExportMdButtonProps {
 	sessionId: string | null;
@@ -12,17 +12,12 @@ export function ExportMdButton({
 	sessionId,
 	sessionTitle,
 }: ExportMdButtonProps) {
+	const chatApi = useChatApi();
+
 	const exportMd = async () => {
 		if (!sessionId) return;
 		try {
-			const res = await fetch(
-				`${API_BASE}/api/chat/sessions/${sessionId}/messages`,
-			);
-			if (!res.ok) {
-				toast.error('会話の取得に失敗しました');
-				return;
-			}
-			const messages = await res.json();
+			const messages = await chatApi.listMessages(sessionId);
 			const lines: string[] = [`# ${sessionTitle}\n`];
 			for (const m of messages) {
 				const role = m.role === 'user' ? 'あなた' : 'アシスタント';
@@ -39,7 +34,7 @@ export function ExportMdButton({
 			const md = lines.join('\n');
 			await navigator.clipboard.writeText(md);
 			toast.success('Markdownをクリップボードにコピーしました');
-		} catch (e) {
+		} catch {
 			toast.error('Markdownのコピーに失敗しました');
 		}
 	};

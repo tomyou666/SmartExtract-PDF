@@ -1,14 +1,9 @@
-import { useEffect, useState } from 'react';
 import { FileText, Trash2, Upload } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { usePdfApi } from '@/contexts/AppApiContext';
+import type { PdfRecord } from '@/lib/ports/pdfApi';
 import { cn } from '@/lib/utils';
-import { API_BASE } from '@/lib/utils';
-
-interface PdfItem {
-	id: number;
-	filename: string;
-	created_at: string;
-}
 
 interface LeftSidebarProps {
 	onPdfSelect: (id: number) => void;
@@ -16,19 +11,25 @@ interface LeftSidebarProps {
 }
 
 export function LeftSidebar({ onPdfSelect, onPdfDelete }: LeftSidebarProps) {
-	const [pdfs, setPdfs] = useState<PdfItem[]>([]);
+	const pdfApi = usePdfApi();
+	const [pdfs, setPdfs] = useState<PdfRecord[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [deletingId, setDeletingId] = useState<number | null>(null);
 
 	useEffect(() => {
-		fetch(`${API_BASE}/api/pdfs`)
-			.then((r) => r.json())
-			.then((data: PdfItem[]) => {
-				setPdfs(data);
+		let cancelled = false;
+		pdfApi
+			.list()
+			.then((data) => {
+				if (!cancelled) setPdfs(data);
 			})
-			.catch(() => setPdfs([]))
-			.finally(() => setLoading(false));
-	}, []);
+			.finally(() => {
+				if (!cancelled) setLoading(false);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [pdfApi]);
 
 	const handleUpload = () => {
 		const input = document.createElement('input');
@@ -37,14 +38,8 @@ export function LeftSidebar({ onPdfSelect, onPdfDelete }: LeftSidebarProps) {
 		input.onchange = async (e) => {
 			const file = (e.target as HTMLInputElement).files?.[0];
 			if (!file) return;
-			const form = new FormData();
-			form.append('file', file);
-			const res = await fetch(`${API_BASE}/api/pdfs`, {
-				method: 'POST',
-				body: form,
-			});
-			if (res.ok) {
-				const created = await res.json();
+			const created = await pdfApi.upload(file);
+			if (created) {
 				setPdfs((prev) => [{ ...created, filename: file.name }, ...prev]);
 				onPdfSelect(created.id);
 			}
@@ -52,16 +47,14 @@ export function LeftSidebar({ onPdfSelect, onPdfDelete }: LeftSidebarProps) {
 		input.click();
 	};
 
-	const handleDelete = async (e: React.MouseEvent, pdf: PdfItem) => {
+	const handleDelete = async (e: React.MouseEvent, pdf: PdfRecord) => {
 		e.stopPropagation();
 		if (deletingId !== null) return;
 		if (!confirm(`「${pdf.filename}」を削除してもよろしいですか？`)) return;
 		setDeletingId(pdf.id);
 		try {
-			const res = await fetch(`${API_BASE}/api/pdfs/${pdf.id}`, {
-				method: 'DELETE',
-			});
-			if (res.ok) {
+			const ok = await pdfApi.remove(pdf.id);
+			if (ok) {
 				setPdfs((prev) => prev.filter((p) => p.id !== pdf.id));
 				onPdfDelete?.(pdf.id);
 			}

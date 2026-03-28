@@ -21,8 +21,8 @@ import '@react-pdf-viewer/zoom/lib/styles/index.css';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
 import { TocPanel } from '@/components/TocPanel';
+import { usePdfApi } from '@/contexts/AppApiContext';
 import { PdfSidebarContext } from '@/contexts/PdfSidebarContext';
-import { API_BASE } from '@/lib/utils';
 import { toolbarSyncPlugin } from '@/plugins/toolbarSyncPlugin';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
 import { useThemeStore } from '@/stores/themeStore';
@@ -32,6 +32,7 @@ interface PdfViewerProps {
 }
 
 export function PdfViewer({ pdfId }: PdfViewerProps) {
+	const pdfApi = usePdfApi();
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [containerHeight, setContainerHeight] = useState(0);
 	const [isPanning, setIsPanning] = useState(false);
@@ -362,7 +363,7 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 		return () => setViewerApi(null);
 	}, [setViewerApi]);
 
-	const url = pdfId ? `${API_BASE}/api/pdfs/${pdfId}` : null;
+	const url = pdfId ? pdfApi.getDocumentUrl(pdfId) : null;
 
 	// url/pdfId が変わったときだけスロットを更新。bookmark/thumbnail を依存に含めると setSlots の無限ループになる
 	// biome-ignore lint/correctness/useExhaustiveDependencies: 上記の理由で bookmark/thumbnail を意図的に除外

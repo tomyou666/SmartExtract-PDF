@@ -1,9 +1,9 @@
 import { Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { createPdfToc, getPdfToc } from '@/lib/pdfToc';
-import type { TocItem } from '@/types/toc';
+import { usePdfApi } from '@/contexts/AppApiContext';
 import { usePdfViewerStore } from '@/stores/pdfViewerStore';
+import type { TocItem } from '@/types/toc';
 
 interface TocPanelProps {
 	pdfId: string | null;
@@ -11,6 +11,7 @@ interface TocPanelProps {
 }
 
 export function TocPanel({ pdfId, bookmarksSlot }: TocPanelProps) {
+	const pdfApi = usePdfApi();
 	const hasEmbeddedOutline = usePdfViewerStore((s) => s.hasEmbeddedOutline);
 	const viewerApi = usePdfViewerStore((s) => s.viewerApi);
 
@@ -20,25 +21,28 @@ export function TocPanel({ pdfId, bookmarksSlot }: TocPanelProps) {
 	const [creating, setCreating] = useState(false);
 	const [createError, setCreateError] = useState<string | null>(null);
 
-	const fetchToc = useCallback(async (id: string) => {
-		setTocLoading(true);
-		setTocError(null);
-		try {
-			const res = await getPdfToc(id);
-			const items = res?.items ?? (Array.isArray(res) ? res : []);
-			setApiToc(items);
-		} catch (e) {
-			if (e instanceof Error && e.message === 'NOT_FOUND') {
-				setApiToc(null);
-			} else {
-				setTocError(
-					e instanceof Error ? e.message : '目次の取得に失敗しました',
-				);
+	const fetchToc = useCallback(
+		async (id: string) => {
+			setTocLoading(true);
+			setTocError(null);
+			try {
+				const res = await pdfApi.getToc(id);
+				const items = res?.items ?? (Array.isArray(res) ? res : []);
+				setApiToc(items);
+			} catch (e) {
+				if (e instanceof Error && e.message === 'NOT_FOUND') {
+					setApiToc(null);
+				} else {
+					setTocError(
+						e instanceof Error ? e.message : '目次の取得に失敗しました',
+					);
+				}
+			} finally {
+				setTocLoading(false);
 			}
-		} finally {
-			setTocLoading(false);
-		}
-	}, []);
+		},
+		[pdfApi],
+	);
 
 	useEffect(() => {
 		if (!pdfId || hasEmbeddedOutline !== false) {
@@ -54,7 +58,7 @@ export function TocPanel({ pdfId, bookmarksSlot }: TocPanelProps) {
 		setCreating(true);
 		setCreateError(null);
 		try {
-			await createPdfToc(pdfId);
+			await pdfApi.createToc(pdfId);
 			await fetchToc(pdfId);
 		} catch (e) {
 			setCreateError(
@@ -63,7 +67,7 @@ export function TocPanel({ pdfId, bookmarksSlot }: TocPanelProps) {
 		} finally {
 			setCreating(false);
 		}
-	}, [pdfId, fetchToc]);
+	}, [pdfId, fetchToc, pdfApi]);
 
 	const handleTocItemClick = useCallback(
 		(page: number) => {
