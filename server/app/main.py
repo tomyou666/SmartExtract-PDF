@@ -1,27 +1,28 @@
-import logging
-import sys
 from contextlib import asynccontextmanager
 
+import app.share.global_value as g
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings as config_settings
-from app.routers import pdfs, settings, chat
-from app.services.storage import storage_service
+from app.config.di import DI
+from app.db import engine
+from app.presentation.routers import chat, pdfs, settings
+from app.infrastructure.persistence.file_storage import FsspecFileStorage
+from app.share.logger_util import get_logger
 
-# アプリ全体のログを標準出力に出す
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    stream=sys.stdout,
-    force=True,
-)
+logger = get_logger()
+
+# DI の初期化（tomyou-ea の g.injector と同様、モジュール読み込み時に先に代入）
+g.injector = DI()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    storage_service.ensure_ready()
+async def lifespan(app: FastAPI):  # noqa: ARG001
+    g.injector.injector.get(FsspecFileStorage).ensure_ready()
+    logger.info("Storage ready")
     yield
+    await engine.dispose()
 
 
 app = FastAPI(title="PDF × LLM Chat API", lifespan=lifespan)

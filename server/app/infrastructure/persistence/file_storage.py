@@ -1,15 +1,37 @@
+"""ストレージ（local / S3）の抽象と fsspec 実装。"""
+
 import os
 import tempfile
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, Protocol, runtime_checkable
 
-import fsspec
+import fsspec  # type: ignore[import-untyped]
+from injector import inject
 
-from app.config import settings
+from app.config import Settings
 
 
-class StorageService:
-    def __init__(self) -> None:
+@runtime_checkable
+class IFileStorage(Protocol):
+    def ensure_ready(self) -> None: ...
+
+    def save_bytes(self, key: str, data: bytes) -> str: ...
+
+    def open_read(self, path_or_key: str) -> BinaryIO: ...
+
+    def exists(self, path_or_key: str) -> bool: ...
+
+    def delete(self, path_or_key: str) -> None: ...
+
+    def download_to_temp(self, path_or_key: str) -> Path: ...
+
+
+class FsspecFileStorage:
+    """fsspec による local / S3 ストレージ実装。"""
+
+    @inject
+    def __init__(self, settings: Settings) -> None:
+        self._settings = settings
         self.backend = settings.storage_backend.lower()
         self.base_path = settings.storage_base_path.strip()
         self._protocol, self._storage_options = self._build_backend_config()
@@ -19,18 +41,18 @@ class StorageService:
 
     def _build_backend_config(self) -> tuple[str, dict]:
         if self.backend == "s3":
-            if not settings.s3_bucket:
+            if not self._settings.s3_bucket:
                 raise RuntimeError("S3 backend requires S3_BUCKET")
             options: dict = {}
-            if settings.aws_access_key_id:
-                options["key"] = settings.aws_access_key_id
-            if settings.aws_secret_access_key:
-                options["secret"] = settings.aws_secret_access_key
+            if self._settings.aws_access_key_id:
+                options["key"] = self._settings.aws_access_key_id
+            if self._settings.aws_secret_access_key:
+                options["secret"] = self._settings.aws_secret_access_key
             client_kwargs: dict = {}
-            if settings.aws_region:
-                client_kwargs["region_name"] = settings.aws_region
-            if settings.aws_endpoint_url:
-                client_kwargs["endpoint_url"] = settings.aws_endpoint_url
+            if self._settings.aws_region:
+                client_kwargs["region_name"] = self._settings.aws_region
+            if self._settings.aws_endpoint_url:
+                client_kwargs["endpoint_url"] = self._settings.aws_endpoint_url
             if client_kwargs:
                 options["client_kwargs"] = client_kwargs
             return "s3", options
@@ -45,14 +67,14 @@ class StorageService:
             self._ensure_local_base_dir()
 
     def _local_base_dir(self) -> Path:
-        base = Path(self.base_path or str(settings.upload_dir))
+        base = Path(self.base_path or str(self._settings.upload_dir))
         if base.is_absolute():
             return base
         server_root = Path(__file__).resolve().parent.parent.parent
         return (server_root / base).resolve()
 
     def _s3_base_prefix(self) -> str:
-        prefix = settings.s3_prefix.strip().strip("/")
+        prefix = self._settings.s3_prefix.strip().strip("/")
         if self.base_path:
             extra = self.base_path.strip().strip("/")
             prefix = f"{prefix}/{extra}" if prefix else extra
@@ -63,7 +85,7 @@ class StorageService:
         if self.backend == "s3":
             base_prefix = self._s3_base_prefix()
             object_key = f"{base_prefix}/{key}" if base_prefix else key
-            return f"s3://{settings.s3_bucket}/{object_key}"
+            return f"s3://{self._settings.s3_bucket}/{object_key}"
         return str((self._local_base_dir() / key).resolve())
 
     def save_bytes(self, key: str, data: bytes) -> str:
@@ -108,6 +130,3 @@ class StorageService:
                 pass
             raise
         return Path(tmp_path)
-
-
-storage_service = StorageService()

@@ -27,8 +27,7 @@ client/.vite/
 *.pem
 
 # === Uploads & runtime data ===
-server/uploads/*
-!server/uploads/.gitkeep
+server/**/uploads/*
 
 # === OS ===
 .DS_Store
@@ -39,6 +38,7 @@ Thumbs.db
 .idea/
 
 # === Logs & temp ===
+server/log/
 *.log
 *.tmp
 .cache/
