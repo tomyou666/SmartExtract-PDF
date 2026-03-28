@@ -9,4 +9,8 @@
     "[typescriptreact]": {
         "editor.defaultFormatter": "biomejs.biome"
     },
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.pytest_cache": true
+    }
 }
