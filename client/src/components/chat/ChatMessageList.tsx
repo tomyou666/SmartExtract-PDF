@@ -124,8 +124,9 @@ export function ChatMessageList({
 				expandedRange.setEndAfter(blockEls[lastIdx]);
 				sel.removeAllRanges();
 				sel.addRange(expandedRange);
-			} catch {
-				// ignore
+			} catch (e) {
+				// 選択境界が DOM とずれると Range が失敗しうる。clipboard には rawText をそのまま渡すので致命的ではない
+				console.warn('[ChatMessageList] expand selection to copy blocks', e);
 			}
 
 			e.preventDefault();

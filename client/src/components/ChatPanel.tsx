@@ -61,8 +61,13 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 					}
 					// 送信済みメッセージにサーバー側の id を反映するため再取得
 					await fetchMessages(currentSessionId);
-				} catch {
-					// ignore
+				} catch (e) {
+					console.error('[ChatPanel] onFinish sync', e);
+					toast.error(
+						e instanceof Error
+							? e.message
+							: '応答後の同期（タイトル・メッセージ取得）に失敗しました',
+					);
 				}
 			},
 		});
@@ -71,8 +76,11 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 		try {
 			const data = await chat.listSessions();
 			setSessions(data);
-		} catch {
-			// 失敗時は既存の一覧を維持（従来の fetch + res.ok と同じ）
+		} catch (e) {
+			console.error('[ChatPanel] fetchSessions', e);
+			toast.error(
+				e instanceof Error ? e.message : 'セッション一覧の取得に失敗しました',
+			);
 		} finally {
 			setLoadingSessions(false);
 		}
@@ -86,7 +94,13 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 		llmSettings
 			.getSettings()
 			.then((data) => setApiKeyConfigured(Boolean(data?.api_key_masked)))
-			.catch(() => setApiKeyConfigured(false));
+			.catch((e) => {
+				console.error('[ChatPanel] getSettings', e);
+				toast.error(
+					e instanceof Error ? e.message : 'LLM設定の確認に失敗しました',
+				);
+				setApiKeyConfigured(null);
+			});
 	}, [llmSettings, setApiKeyConfigured]);
 
 	useEffect(() => {
@@ -105,17 +119,20 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 			const trimmed = newTitle.trim();
 			if (trimmed === '') return;
 			try {
-				const ok = await chat.updateSessionTitle(currentSessionId, trimmed);
-				if (ok) {
-					setCurrentSession(currentSessionId, trimmed);
-					setSessions((prev) =>
-						prev.map((s) =>
-							s.id === currentSessionId ? { ...s, title: trimmed } : s,
-						),
-					);
-				}
-			} catch {
-				// ignore
+				await chat.updateSessionTitle(currentSessionId, trimmed);
+				setCurrentSession(currentSessionId, trimmed);
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.id === currentSessionId ? { ...s, title: trimmed } : s,
+					),
+				);
+			} catch (e) {
+				console.error('[ChatPanel] updateTitle', e);
+				toast.error(
+					e instanceof Error
+						? e.message
+						: 'セッションタイトルの更新に失敗しました',
+				);
 			}
 		},
 		[chat, currentSessionId, setCurrentSession],
@@ -124,8 +141,7 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 	const deleteSession = useCallback(
 		async (sessionId: string) => {
 			try {
-				const ok = await chat.deleteSession(sessionId);
-				if (!ok) return;
+				await chat.deleteSession(sessionId);
 				setSessions((prev) => prev.filter((s) => s.id !== sessionId));
 				if (currentSessionId === sessionId) {
 					const remaining = sessions.filter((s) => s.id !== sessionId);
@@ -135,8 +151,11 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 					setCurrentSession(nextId, nextTitle);
 				}
 				toast.success('セッションを削除しました');
-			} catch {
-				// ignore
+			} catch (e) {
+				console.error('[ChatPanel] deleteSession', e);
+				toast.error(
+					e instanceof Error ? e.message : 'セッションの削除に失敗しました',
+				);
 			}
 		},
 		[chat, currentSessionId, sessions, setCurrentSession],
@@ -184,7 +203,15 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 					setMessages(uiMessages as unknown as typeof messages);
 					if (msgs.length > 0) setTitleGeneratedForSessionId(sessionId);
 				})
-				.catch(() => {}),
+				.catch((err) => {
+					if (options?.isCancelled?.()) return;
+					console.error('[ChatPanel] fetchMessages', err);
+					toast.error(
+						err instanceof Error
+							? err.message
+							: 'メッセージの取得に失敗しました',
+					);
+				}),
 		[chat, setMessages],
 	);
 
@@ -200,19 +227,24 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 		};
 	}, [currentSessionId, fetchMessages, setMessages]);
 
-	const createSession = async () => {
+	const createSession = async (): Promise<boolean> => {
 		try {
 			const session = await chat.createSession({
 				pdfId: pdfId ? Number(pdfId) : null,
 				title: '新規チャット',
 			});
-			if (session) {
-				setSessions((prev) => [session, ...prev]);
-				setCurrentSessionId(session.id);
-				setCurrentSession(session.id, session.title);
-			}
-		} catch {
-			// ignore
+			setSessions((prev) => [session, ...prev]);
+			setCurrentSessionId(session.id);
+			setCurrentSession(session.id, session.title);
+			return true;
+		} catch (e) {
+			console.error('[ChatPanel] createSession', e);
+			toast.error(
+				e instanceof Error
+					? e.message
+					: 'チャットセッションの作成に失敗しました',
+			);
+			return false;
 		}
 	};
 
@@ -222,8 +254,9 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 			.then(() => {
 				toast.success('コピーしました');
 			})
-			.catch(() => {
-				// ignore
+			.catch((err) => {
+				console.error('[ChatPanel] copyMessage clipboard', err);
+				toast.error('クリップボードへのコピーに失敗しました');
 			});
 	};
 
@@ -253,12 +286,14 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 		async (messageId: string) => {
 			if (!currentSessionId) return;
 			try {
-				const ok = await chat.deleteMessage(currentSessionId, messageId);
-				if (!ok) return;
+				await chat.deleteMessage(currentSessionId, messageId);
 				await fetchMessages(currentSessionId);
 				toast.success('会話を削除しました');
-			} catch {
-				// ignore
+			} catch (e) {
+				console.error('[ChatPanel] deleteConversationTurn', e);
+				toast.error(
+					e instanceof Error ? e.message : '会話の削除に失敗しました',
+				);
 			}
 		},
 		[chat, currentSessionId, fetchMessages],
@@ -277,12 +312,17 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 					}))
 				: undefined;
 		if (text === '' && !attachments) return;
-		setInput('');
 		if (!currentSessionId) {
 			setPendingFirstMessage({ text, attachments });
-			await createSession();
+			const created = await createSession();
+			if (!created) {
+				setPendingFirstMessage(null);
+				return;
+			}
+			setInput('');
 			return;
 		}
+		setInput('');
 		if (attachments) clearImages();
 		await append(
 			{
@@ -311,7 +351,9 @@ export const ChatPanel = memo(function ChatPanel({ pdfId }: ChatPanelProps) {
 				sessions={sessions}
 				currentSessionId={currentSessionId}
 				currentSessionTitle={currentSession?.title ?? ''}
-				onCreateSession={createSession}
+				onCreateSession={async () => {
+					await createSession();
+				}}
 				onSelectSession={(id) => {
 					setCurrentSessionId(id);
 					if (id) {

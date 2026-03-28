@@ -1,5 +1,6 @@
 import { Settings, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -47,30 +48,58 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
 			llmSettings
 				.listModels(p)
 				.then((names) => setModels(names))
-				.catch(() => setModels([]));
+				.catch((e) => {
+					console.error('[SettingsSheet] listModels', e);
+					toast.error(
+						e instanceof Error ? e.message : 'モデル一覧の取得に失敗しました',
+					);
+					setModels([]);
+				});
 		},
 		[llmSettings],
 	);
 
 	useEffect(() => {
 		if (!open) return;
-		// LLM 設定の読み込み
-		llmSettings
-			.listProviders()
-			.then((data) => setProviders(Array.isArray(data) ? data : []))
-			.catch(() => setProviders([]));
-		llmSettings
-			.getSettings()
-			.then((data) => {
-				if (!data) return;
-				const p = data.provider ?? 'openai';
-				const m = data.model ?? '';
+		let cancelled = false;
+		(async () => {
+			try {
+				const data = await llmSettings.listProviders();
+				if (cancelled) return;
+				setProviders(Array.isArray(data) ? data : []);
+			} catch (e) {
+				console.error('[SettingsSheet] listProviders', e);
+				if (!cancelled) {
+					toast.error(
+						e instanceof Error
+							? e.message
+							: 'プロバイダー一覧の取得に失敗しました',
+					);
+					setProviders([]);
+				}
+			}
+			try {
+				const settings = await llmSettings.getSettings();
+				if (cancelled) return;
+				if (!settings) return;
+				const p = settings.provider ?? 'openai';
+				const m = settings.model ?? '';
 				setProvider(p);
 				setModel(m);
-				setApiKey(data.api_key_masked ? '********' : '');
+				setApiKey(settings.api_key_masked ? '********' : '');
 				fetchModelsForProvider(p);
-			})
-			.catch(() => {});
+			} catch (e) {
+				console.error('[SettingsSheet] getSettings', e);
+				if (!cancelled) {
+					toast.error(
+						e instanceof Error ? e.message : 'LLM設定の取得に失敗しました',
+					);
+				}
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
 	}, [open, fetchModelsForProvider, llmSettings]);
 
 	// モデル一覧が変わったときのフォールバック
@@ -93,14 +122,19 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
 			model,
 		};
 		if (apiKey && apiKey !== '********') body.api_key = apiKey;
-		const ok = await llmSettings.saveSettings(body);
-		if (ok) {
+		try {
+			await llmSettings.saveSettings(body);
 			setSaved(true);
 			setTimeout(() => setSaved(false), 2000);
 			if (body.api_key !== undefined) {
 				setApiKeyConfigured(true);
 			}
 			onClose();
+		} catch (err) {
+			console.error('[SettingsSheet] saveSettings', err);
+			toast.error(
+				err instanceof Error ? err.message : 'LLM設定の保存に失敗しました',
+			);
 		}
 	};
 
@@ -110,6 +144,13 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
 			await clearOcrCacheDatabase();
 			setCacheCleared(true);
 			setTimeout(() => setCacheCleared(false), 2000);
+		} catch (err) {
+			console.error('[SettingsSheet] clearOcrCacheDatabase', err);
+			toast.error(
+				err instanceof Error
+					? err.message
+					: 'OCRキャッシュの削除に失敗しました',
+			);
 		} finally {
 			setClearingCache(false);
 		}

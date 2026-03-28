@@ -1,5 +1,6 @@
 import { FileText, Trash2, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { usePdfApi } from '@/contexts/AppApiContext';
 import type { PdfRecord } from '@/lib/ports/pdfApi';
@@ -23,6 +24,14 @@ export function LeftSidebar({ onPdfSelect, onPdfDelete }: LeftSidebarProps) {
 			.then((data) => {
 				if (!cancelled) setPdfs(data);
 			})
+			.catch((e) => {
+				console.error('[LeftSidebar] pdfApi.list', e);
+				if (!cancelled) {
+					toast.error(
+						e instanceof Error ? e.message : 'PDF一覧の取得に失敗しました',
+					);
+				}
+			})
 			.finally(() => {
 				if (!cancelled) setLoading(false);
 			});
@@ -38,10 +47,17 @@ export function LeftSidebar({ onPdfSelect, onPdfDelete }: LeftSidebarProps) {
 		input.onchange = async (e) => {
 			const file = (e.target as HTMLInputElement).files?.[0];
 			if (!file) return;
-			const created = await pdfApi.upload(file);
-			if (created) {
+			try {
+				const created = await pdfApi.upload(file);
 				setPdfs((prev) => [{ ...created, filename: file.name }, ...prev]);
 				onPdfSelect(created.id);
+			} catch (err) {
+				console.error('[LeftSidebar] pdfApi.upload', err);
+				toast.error(
+					err instanceof Error
+						? err.message
+						: 'PDFのアップロードに失敗しました',
+				);
 			}
 		};
 		input.click();
@@ -53,11 +69,14 @@ export function LeftSidebar({ onPdfSelect, onPdfDelete }: LeftSidebarProps) {
 		if (!confirm(`「${pdf.filename}」を削除してもよろしいですか？`)) return;
 		setDeletingId(pdf.id);
 		try {
-			const ok = await pdfApi.remove(pdf.id);
-			if (ok) {
-				setPdfs((prev) => prev.filter((p) => p.id !== pdf.id));
-				onPdfDelete?.(pdf.id);
-			}
+			await pdfApi.remove(pdf.id);
+			setPdfs((prev) => prev.filter((p) => p.id !== pdf.id));
+			onPdfDelete?.(pdf.id);
+		} catch (err) {
+			console.error('[LeftSidebar] pdfApi.remove', err);
+			toast.error(
+				err instanceof Error ? err.message : 'PDFの削除に失敗しました',
+			);
 		} finally {
 			setDeletingId(null);
 		}

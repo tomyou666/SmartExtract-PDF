@@ -75,7 +75,9 @@ export function toolbarSyncPlugin(): Plugin {
 					const has = Array.isArray(outline) && outline.length > 0;
 					usePdfViewerStore.getState().setHasEmbeddedOutline(has);
 				})
-				.catch(() => {
+				.catch((e) => {
+					// アウトライン無し PDF や取得失敗時は false。ログは調査用（想定外の reject も含む）
+					console.error('[toolbarSyncPlugin] getOutline', e);
 					usePdfViewerStore.getState().setHasEmbeddedOutline(false);
 				});
 		},

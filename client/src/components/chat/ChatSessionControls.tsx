@@ -54,7 +54,8 @@ export const ChatSessionControls = memo(function ChatSessionControls({
 		try {
 			await onUpdateTitle(newTitle);
 			setEditingTitle(false);
-		} catch {
+		} catch (e) {
+			console.error('[ChatSessionControls] saveTitle / onUpdateTitle', e);
 			setEditingTitle(false);
 		}
 	};

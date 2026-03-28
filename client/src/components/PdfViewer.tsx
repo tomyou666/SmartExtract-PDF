@@ -269,8 +269,9 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 
 			try {
 				rootEl.setPointerCapture(e.pointerId);
-			} catch {
-				// ignore
+			} catch (e) {
+				// console.error にしない: フォーカス喪失などで capture が取れないことがあり、パンは従来どおり動く想定内
+				console.warn('[PdfViewer] setPointerCapture', e);
 			}
 		};
 
@@ -319,8 +320,9 @@ export function PdfViewer({ pdfId }: PdfViewerProps) {
 
 			try {
 				rootEl.releasePointerCapture(e.pointerId);
-			} catch {
-				// ignore
+			} catch (e) {
+				// console.error にしない: 未 capture の pointer で release が失敗することがある（想定内）
+				console.warn('[PdfViewer] releasePointerCapture', e);
 			}
 		};
 

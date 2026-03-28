@@ -74,6 +74,11 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 			);
 			setLastAutoOrderedRects(pageIndex, rects);
 			replaceSelectionRectsForPage(pageIndex, rects);
+		} catch (e) {
+			console.error('[PdfImageToolbar] runAutoSelection', e);
+			toast.error(
+				e instanceof Error ? e.message : '自動矩形選択に失敗しました',
+			);
 		} finally {
 			setAutoSelecting(false);
 		}
@@ -85,7 +90,8 @@ export function PdfImageToolbar({ pdfId }: PdfImageToolbarProps) {
 		try {
 			await copyImageDataUrlToClipboard(url);
 			toast.success('クリップボードにコピーしました');
-		} catch {
+		} catch (e) {
+			console.error('[PdfImageToolbar] copySelectionToClipboard', e);
 			toast.error('コピーに失敗しました');
 		}
 	};

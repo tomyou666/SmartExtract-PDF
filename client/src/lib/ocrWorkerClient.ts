@@ -164,7 +164,9 @@ function onResult(result: OcrTaskResult): void {
 			imageHeight: layoutCachePayload.imageHeight,
 			paddedWidth: layoutCachePayload.paddedWidth,
 			paddedHeight: layoutCachePayload.paddedHeight,
-		}).catch(() => {});
+		}).catch((e) => {
+			console.error('[ocrWorkerClient] setLayoutCache after OCR', e);
+		});
 	}
 	if (lines) {
 		const cacheValue: Parameters<typeof setOcrCache>[2] = { lines };
@@ -172,7 +174,9 @@ function onResult(result: OcrTaskResult): void {
 			cacheValue.imageWidth = imageWidth;
 			cacheValue.imageHeight = imageHeight;
 		}
-		setOcrCache(pdfId, pageIndex, cacheValue).catch(() => {});
+		setOcrCache(pdfId, pageIndex, cacheValue).catch((e) => {
+			console.error('[ocrWorkerClient] setOcrCache after OCR', e);
+		});
 		usePdfViewerStore.getState().setOcrResult(key, { lines });
 	}
 }

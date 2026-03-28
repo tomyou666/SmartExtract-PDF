@@ -17,5 +17,5 @@ export interface LlmSettingsApi {
 		provider: string;
 		model: string;
 		api_key?: string;
-	}): Promise<boolean>;
+	}): Promise<void>;
 }

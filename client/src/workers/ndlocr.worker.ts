@@ -510,6 +510,7 @@ self.onmessage = async (ev: MessageEvent<WorkerTask>) => {
 			paddedHeight,
 		});
 	} catch (err) {
+		console.error('[ndlocr.worker] task failed', err);
 		self.postMessage({
 			type: 'error',
 			pdfId: payload.pdfId,

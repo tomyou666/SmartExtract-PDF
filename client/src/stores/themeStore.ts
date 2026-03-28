@@ -29,8 +29,9 @@ const getDefaultTheme = (): Theme => {
 	try {
 		if (window.matchMedia?.('(prefers-color-scheme: dark)')?.matches)
 			return 'dark';
-	} catch {
-		// ignore
+	} catch (e) {
+		// console.error にしない: 一部環境・プライベートモード等で matchMedia が例外になることがある（ライトにフォールバック）
+		console.warn('[themeStore] matchMedia(prefers-color-scheme)', e);
 	}
 	return 'light';
 };

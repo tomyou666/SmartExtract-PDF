@@ -34,7 +34,8 @@ export function ExportMdButton({
 			const md = lines.join('\n');
 			await navigator.clipboard.writeText(md);
 			toast.success('Markdownをクリップボードにコピーしました');
-		} catch {
+		} catch (e) {
+			console.error('[ExportMdButton] exportMd', e);
 			toast.error('Markdownのコピーに失敗しました');
 		}
 	};

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 import { Layout } from '@/components/Layout';
 import { PdfAppLayout } from '@/components/PdfAppLayout';
@@ -16,7 +17,12 @@ export function HomePage() {
 					setLocation(`/pdf/${pdfs[0].id}`);
 				}
 			})
-			.catch(() => {});
+			.catch((e) => {
+				console.error('[HomePage] pdfApi.list', e);
+				toast.error(
+					e instanceof Error ? e.message : 'PDF一覧の取得に失敗しました',
+				);
+			});
 	}, [setLocation, pdfApi]);
 
 	return (

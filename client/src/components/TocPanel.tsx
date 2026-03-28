@@ -33,6 +33,7 @@ export function TocPanel({ pdfId, bookmarksSlot }: TocPanelProps) {
 				if (e instanceof Error && e.message === 'NOT_FOUND') {
 					setApiToc(null);
 				} else {
+					console.error('[TocPanel] fetchToc', e);
 					setTocError(
 						e instanceof Error ? e.message : '目次の取得に失敗しました',
 					);
@@ -61,6 +62,7 @@ export function TocPanel({ pdfId, bookmarksSlot }: TocPanelProps) {
 			await pdfApi.createToc(pdfId);
 			await fetchToc(pdfId);
 		} catch (e) {
+			console.error('[TocPanel] handleCreateToc', e);
 			setCreateError(
 				e instanceof Error ? e.message : '目次の作成に失敗しました',
 			);
