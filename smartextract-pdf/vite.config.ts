@@ -1,32 +1,50 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import path from 'node:path';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
 
-// @ts-expect-error process is a nodejs global
-const host = process.env.TAURI_DEV_HOST;
+/** COEP/COOP を全レスポンスに付与（ONNX Runtime Web / SharedArrayBuffer 用） */
+function crossOriginIsolation() {
+	return {
+		name: 'cross-origin-isolation',
+		configureServer(server) {
+			server.middlewares.use((_req, res, next) => {
+				res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+				res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+				next();
+			});
+		},
+	};
+}
 
-// https://vite.dev/config/
-export default defineConfig(async () => ({
-  plugins: [react()],
-
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
-  clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
-  server: {
-    port: 1420,
-    strictPort: true,
-    host: host || false,
-    hmr: host
-      ? {
-          protocol: "ws",
-          host,
-          port: 1421,
-        }
-      : undefined,
-    watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
-    },
-  },
-}));
+export default defineConfig({
+	plugins: [react(), tailwindcss(), crossOriginIsolation()],
+	assetsInclude: ['**/*.onnx'],
+	optimizeDeps: {
+		include: ['pdfjs-dist'],
+		exclude: ['onnxruntime-web'],
+	},
+	resolve: {
+		alias: { '@': path.resolve(__dirname, 'src') },
+	},
+	server: {
+		port: 5173,
+		// ONNXRuntime-Web の WASM マルチスレッドに必要（SharedArrayBuffer 用）
+		headers: {
+			'Cross-Origin-Opener-Policy': 'same-origin',
+			'Cross-Origin-Embedder-Policy': 'require-corp',
+		},
+		proxy: {
+			'/api': {
+				target: 'http://127.0.0.1:8000',
+				changeOrigin: true,
+			},
+		},
+	},
+	preview: {
+		headers: {
+			'Cross-Origin-Opener-Policy': 'same-origin',
+			'Cross-Origin-Embedder-Policy': 'require-corp',
+		},
+	},
+});
