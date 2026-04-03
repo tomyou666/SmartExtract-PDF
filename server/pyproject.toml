@@ -19,6 +19,7 @@ dependencies = [
     "fsspec>=2026.2.0",
     "s3fs>=2026.2.0",
     "injector>=0.24.0",
+    "cryptography>=46.0.6",
 ]
 
 [project.optional-dependencies]
