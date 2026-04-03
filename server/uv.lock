@@ -1116,7 +1116,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "fsspec", specifier = ">=2026.2.0" },
     { name = "injector", specifier = ">=0.24.0" },
-    { name = "litellm", specifier = ">=1.55.0" },
+    { name = "litellm", specifier = "==1.81.15" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13.0" },
     { name = "pikepdf", specifier = ">=10.3.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
