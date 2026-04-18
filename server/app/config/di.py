@@ -29,6 +29,7 @@ from app.application.use_cases.settings_use_cases import (
     UpdateLlmSettingsUseCase,
 )
 from app.config.settings import Settings, settings as app_settings
+from app.infrastructure.crypto.llm_api_key_cipher import LlmApiKeyCipher
 from app.infrastructure.gateways.litellm_gateway import (
     ILlmCompletionGateway,
     LitellmCompletionGateway,
@@ -64,6 +65,7 @@ class AppModule(Module):
 
     def configure(self, binder: Binder) -> None:
         binder.bind(Settings, to=app_settings, scope=singleton)
+        binder.bind(LlmApiKeyCipher, scope=singleton)
         binder.bind(IFileStorage, to=FsspecFileStorage, scope=singleton)  # type: ignore[type-abstract]
         binder.bind(IPdfRepository, to=SqlAlchemyPdfRepository, scope=singleton)  # type: ignore[type-abstract]
         binder.bind(ITocPdfStorage, to=PypdfTocPdfStorage, scope=singleton)  # type: ignore[type-abstract]

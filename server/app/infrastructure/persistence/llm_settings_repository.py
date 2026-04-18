@@ -2,9 +2,11 @@
 
 from typing import Any, Protocol, runtime_checkable
 
+from injector import inject
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.infrastructure.crypto.llm_api_key_cipher import LlmApiKeyCipher
 from app.schemas.llm import LLMSettingsIn
 
 
@@ -26,6 +28,10 @@ class ILlmSettingsRepository(Protocol):
 
 
 class SqlAlchemyLlmSettingsRepository:
+    @inject
+    def __init__(self, cipher: LlmApiKeyCipher) -> None:
+        self._cipher = cipher
+
     async def get_llm_settings_row(
         self, session: AsyncSession
     ) -> dict[str, Any] | None:
@@ -54,7 +60,7 @@ class SqlAlchemyLlmSettingsRepository:
             "gemini" if (provider or "").lower() == "google" else provider
         )
         model = row["model"] or "gpt-4o"
-        api_key = row["api_key_encrypted"]
+        api_key = self._cipher.decrypt(row["api_key_encrypted"])
         model_string = f"{litellm_provider}/{model}"
         return model_string, provider, api_key
 
@@ -66,6 +72,9 @@ class SqlAlchemyLlmSettingsRepository:
         self, session: AsyncSession, body: LLMSettingsIn
     ) -> dict[str, Any]:
         exists = await self.row_exists(session)
+        stored_key = (
+            self._cipher.encrypt(body.api_key) if body.api_key is not None else None
+        )
         if not exists:
             await session.execute(
                 text(
@@ -74,7 +83,7 @@ class SqlAlchemyLlmSettingsRepository:
                 ),
                 {
                     "provider": body.provider,
-                    "api_key": body.api_key,
+                    "api_key": stored_key,
                     "model": body.model,
                 },
             )
@@ -86,7 +95,7 @@ class SqlAlchemyLlmSettingsRepository:
                 ),
                 {
                     "provider": body.provider,
-                    "api_key": body.api_key,
+                    "api_key": stored_key,
                     "model": body.model,
                 },
             )

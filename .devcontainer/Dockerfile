@@ -11,16 +11,28 @@ RUN curl -fsSL https://moonrepo.dev/install/proto.sh | bash -s -- -y
 
 # マルチビルド-実際に使用するイメージ
 FROM debian:bookworm-slim
+
+ARG USERNAME=vscode
+ARG UID=1000
+ARG GID=1000
+
 RUN apt-get update && apt-get install -y \
-    git
+    git \
+    && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get clean -y && rm -rf /var/lib/apt/lists/*
+RUN groupadd --gid "${GID}" "${USERNAME}" \
+    && useradd --uid "${UID}" --gid "${GID}" -m -s /bin/bash "${USERNAME}"
 
-ENV PROTO_HOME="/root/.proto"
+ENV HOME=/home/${USERNAME}
+ENV PROTO_HOME="${HOME}/.proto"
 ENV UV_LINK_MODE=copy
-ENV PATH="/root/.local/bin:${PROTO_HOME}/shims:${PROTO_HOME}/bin:${PATH}"
+ENV PATH="${HOME}/.local/bin:${PROTO_HOME}/shims:${PROTO_HOME}/bin:${PATH}"
 
-RUN echo 'source "$HOME/.local/bin/env"' >> ~/.bashrc
-RUN ln -s /root/.proto/shims/bun /usr/local/bin/node
-COPY --from=builder /root/.local/ /root/.local/
-COPY --from=builder /root/.proto/ /root/.proto/
+COPY --from=builder --chown=${USERNAME}:${USERNAME} /root/.local/ ${HOME}/.local/
+COPY --from=builder --chown=${USERNAME}:${USERNAME} /root/.proto/ ${HOME}/.proto/
+
+RUN echo 'source "$HOME/.local/bin/env"' >> "${HOME}/.bashrc" \
+    && ln -sf "${HOME}/.proto/shims/bun" /usr/local/bin/node
+
+USER ${USERNAME}
+WORKDIR /workspace

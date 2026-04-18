@@ -3,6 +3,8 @@
   "dockerComposeFile": "compose.yml",
   "service": "pdf-viewer",
   "workspaceFolder": "/workspace",
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
   "customizations": {
     "vscode": {
       "extensions": [
