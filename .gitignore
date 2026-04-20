@@ -42,3 +42,8 @@ server/log/
 *.log
 *.tmp
 .cache/
+
+
+# Added by cargo
+
+/target
