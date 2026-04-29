@@ -1,0 +1,55 @@
+import { FileDown } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { useChatApi } from '@/contexts/AppApiContext';
+
+interface ExportMdButtonProps {
+	sessionId: string | null;
+	sessionTitle: string;
+}
+
+export function ExportMdButton({
+	sessionId,
+	sessionTitle,
+}: ExportMdButtonProps) {
+	const chatApi = useChatApi();
+
+	const exportMd = async () => {
+		if (!sessionId) return;
+		try {
+			const messages = await chatApi.listMessages(sessionId);
+			const lines: string[] = [`# ${sessionTitle}\n`];
+			for (const m of messages) {
+				const role = m.role === 'user' ? 'あなた' : 'アシスタント';
+				const text =
+					m.content_json?.text ??
+					(Array.isArray(m.content_json?.parts)
+						? m.content_json.parts
+								.filter((p: { type: string }) => p.type === 'text')
+								.map((p: { text?: string }) => p.text ?? '')
+								.join('')
+						: '');
+				lines.push(`## ${role}\n\n${text}\n`);
+			}
+			const md = lines.join('\n');
+			await navigator.clipboard.writeText(md);
+			toast.success('Markdownをクリップボードにコピーしました');
+		} catch (e) {
+			console.error('[ExportMdButton] exportMd', e);
+			toast.error('Markdownのコピーに失敗しました');
+		}
+	};
+
+	return (
+		<Button
+			variant='ghost'
+			size='sm'
+			onClick={exportMd}
+			disabled={!sessionId}
+			title='会話をMarkdownでコピー'
+		>
+			<FileDown className='mr-1 h-4 w-4' />
+			MDをコピー
+		</Button>
+	);
+}
